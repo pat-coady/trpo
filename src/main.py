@@ -20,11 +20,18 @@ class Policy(object):
         """ Launch TensorFlow session and initialize variables"""
 
     def update(self, observes, actions, advantages):
-        """ Perform policy update based on batch of samples
+        """ Perform policy update based on batch (size = N) of samples
 
-        return loss and d_kl
+        :param observes: NumPy shape = (N, obs_dim)
+        :param actions: NumPy shape = (N, act_dim)
+        :param advantages: NumPy shape = (N,)
+        :return: dictionary of metrics
+            'AvgRew'
+            'KLOldNew'
+            'Entropy'
+            'AvgLoss'
         """
-        pass
+        return None
 
     def close_sess(self):
         pass
@@ -62,6 +69,20 @@ def init_gym(env_name='Pendulum-v0'):
     return env, obs_dim, act_dim
 
 
+def run_episode(env, policy, animate=False):
+    """ Run single episode with option to animate
+
+    :param env: ai gym environment
+    :param policy: policy with "sample" method
+    :param animate: boolean, True uses env.render() method to animate episode
+    :return: 3-tuple of NumPy arrays
+        observes: shape = (episode len, obs_dim)
+        actions: shape = (episode len, act_dim)
+        rewards: shape = (episode len,)
+    """
+    return None, None, None
+
+
 def run_policy(env, policy, min_steps):
     """ Run policy and collect data for a minimum of min_steps
 
@@ -74,6 +95,18 @@ def run_policy(env, policy, min_steps):
         'actions' : NumPy array of actions from episode
         'rewards' : NumPy array of (undiscounted) rewards from episode
     """
+    # use run_episode
+    return [None, None, None]
+
+
+def view_policy(env, policy):
+    """ Run policy and view using env.render() method
+
+    :param env: ai gym environment
+    :param policy: policy with "sample" method
+    :return: None
+    """
+    # use run_episode
 
 
 def add_disc_sum_rew(trajectories, gamma=1.0):
@@ -110,7 +143,12 @@ def build_train_set(trajectories):
     advantages: shape = (N,)
     disc_sum_rew: shape = (N,)
     """
+    return None, None, None, None
 
+def disp_metrics(metrics):
+    """Print metrics to stdout"""
+    for key in metrics:
+        print(key, ' ', metrics[key])
 
 def main(num_iter=100,
          gamma=1.0):
@@ -125,25 +163,19 @@ def main(num_iter=100,
     for i in range(num_iter):
         # collect data batch using policy
         trajectories = run_policy(env, policy)
-        #   calculate cum_sum_rew: all time steps
+        # calculate cum_sum_rew: all time steps
         add_disc_sum_rew(trajectories, gamma)
-        #   value prediction: all time steps
+        # value prediction: all time steps
         add_value(trajectories, val_func)
-        #   calculate advantages: cum_sum_rew - v(s_t)
+        # calculate advantages: cum_sum_rew - v(s_t)
         add_advantage(trajectories)
-        #   policy update
+        # policy update
         observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
-        policy.update(observes, actions, advantages)
-        #   fit value function
-        val_func.fit(observes, disc_sum_rew)
-
-    pass
-
-
-
+        metrics = policy.update(observes, actions, advantages)
+        # fit value function
+        metrics.update(val_func.fit(observes, disc_sum_rew))
+        disp_metrics(metrics)
+        # view policy
+        view_policy(env, policy)
 
 
-
-
-
-policy = Policy(obs_dim, action_dim)
