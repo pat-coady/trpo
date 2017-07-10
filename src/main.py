@@ -4,20 +4,63 @@ import tensorflow as tf
 
 
 class Policy(object):
-    def __init__(self, obs_dim, action_dim):
-        self._build_graph()
+    def __init__(self, obs_dim, act_dim, hid_units=30):
+
+        self._build_graph(obs_dim, act_dim, hid_units)
+
         self._init_session()
+
+    def _build_graph(self, obs_dim, act_dim, hid_units):
+        """ Build graph with policy, d_kl and loss"""
+        self.g = tf.Graph()
+        with self.g.as_default():
+            self.obs_ph = tf.placeholder(tf.float32, (None, obs_dim), 'obs')
+            self.act_ph = tf.placeholder(tf.float32, (None, act_dim), 'act')
+            self.training_ph = tf.placeholder(tf.bool, (1,), 'training')
+            normed = tf.layers.batch_normalization(self.obs_ph, training=self.training_ph)
+            hid1 = tf.layers.dense(normed, hid_units, tf.tanh,
+                                   kernel_initializer=tf.random_normal_initializer(
+                                       stddev=(np.sqrt(2/obs_dim))),
+                                   name='hid1')
+            self.means = tf.layers.dense(hid1, act_dim,
+                                         kernel_initializer=tf.random_normal_initializer(
+                                             stddev=(np.sqrt(2/obs_dim))),
+                                         name='means')
+            self.log_vars = tf.get_variable("log_vars", act_dim,
+                                            initializer=tf.constant_initializer(0.0))
+            self.sampled_act = (self.means +
+                                tf.exp(self.log_vars / 2.0) * tf.random_normal(shape=(act_dim,)))
+
+            logp_act = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)
+            logp_act += -0.5 * tf.reduce_sum(self.log_vars)
+            logp_act += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.means) /
+                                             tf.exp(self.log_vars),
+                                             axis=1, keep_dims=True)
+            self.logp_act = logp_act
+
+            self.old_log_vars = tf.placeholder(tf.float32, (act_dim,))
+            self.old_means = tf.placeholder(tf.float32, (None, act_dim))
+
+            det_cov_old = tf.exp(tf.reduce_sum(self.old_log_vars))
+            det_cov_new = tf.exp(tf.reduce_sum(self.log_vars))
+            tr_old_new = tf.reduce_sum(tf.exp(self.old_log_vars - self.log_vars))
+
+            self.kl = 0.5 * (tf.log(det_cov_new) - tf.log(det_cov_old) + tr_old_new +
+                             tf.reduce_mean(tf.square(self.means - self.old_means) /
+                                            tf.exp(self.log_vars)) - act_dim)
+            self.entropy = 0.5 * (act_dim * (np.log(2 * np.pi) + 1) +
+                                  tf.reduce_mean(self.log_vars))
+            self.init = tf.global_variables_initializer()
+
+
+    def _init_session(self):
+        """ Launch TensorFlow session and initialize variables"""
+        self.sess = tf.Session(graph=g)
+        self.sess.run(self.init)
 
     def sample(self, obs):
         """ Draw sample from policy distribution"""
         pass
-
-    def _build_graph(self):
-        """ Build graph with policy, d_kl and loss"""
-        pass
-
-    def _init_session(self):
-        """ Launch TensorFlow session and initialize variables"""
 
     def update(self, observes, actions, advantages):
         """ Perform policy update based on batch (size = N) of samples
@@ -31,10 +74,13 @@ class Policy(object):
             'Entropy'
             'AvgLoss'
         """
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            train_op = optimizer.minimize(loss)
         return None
 
     def close_sess(self):
-        pass
+        self.sess.close()
 
 
 class ValueFunction(object):
