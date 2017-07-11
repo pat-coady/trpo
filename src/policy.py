@@ -33,24 +33,31 @@ class Policy(object):
     def _policy_nn(self, hid_units, obs_dim, act_dim):
         """ Neural net for policy approximation function """
         # normed = tf.layers.batch_normalization(self.obs_ph, training=self.training_ph)
-        hid1 = tf.layers.dense(self.obs_ph, hid_units, tf.tanh,
-                               kernel_initializer=tf.random_normal_initializer(
-                                   stddev=(np.sqrt(2/obs_dim))),
-                               name='hid1')
-        self.means = tf.layers.dense(hid1, act_dim,
+        # hidden layers
+        out = tf.layers.dense(self.obs_ph, 64, tf.nn.relu,
+                              kernel_initializer=tf.random_normal_initializer(
+                                  stddev=np.sqrt(2 / obs_dim)),
+                              name="h1")
+        out = tf.layers.dense(out, 64, tf.nn.relu,
+                              kernel_initializer=tf.random_normal_initializer(
+                                  stddev=np.sqrt(2 / 64)),
+                              name="h2")
+        # outputs
+        self.means = tf.layers.dense(out, act_dim,
                                      kernel_initializer=tf.random_normal_initializer(
-                                         stddev=(np.sqrt(2/obs_dim))),
-                                     name='means')
-        self.log_vars = tf.get_variable("log_vars", act_dim,
-                                        initializer=tf.constant_initializer(0.0))
+                                         stddev=np.sqrt(2 / 64)),
+                                     name="mu")
+        log_var_10 = tf.get_variable("logvar", [2, act_dim], initializer=tf.constant_initializer(0.0))
+        self.log_vars = tf.reduce_sum(log_var_10, axis=0)
+        # self.log_vars = tf.get_variable("log_vars", (act_dim,),
+        #                                 initializer=tf.constant_initializer(0.0))
 
     def _logprob(self, act_dim):
         """ Log probabilities of batch of states, actions"""
         logp = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)
         logp += -0.5 * tf.reduce_sum(self.log_vars)
         logp += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.means) /
-                                     tf.exp(self.log_vars),
-                                     axis=1, keep_dims=True)
+                                     tf.exp(self.log_vars), axis=1)
         self.logp = logp
 
     def _kl_entropy(self, act_dim):
@@ -86,7 +93,8 @@ class Policy(object):
         # beta_ph: hyper-parameter to control weight of kl-divergence loss
         # self.loss += -tf.reduce_mean(self.beta_ph * self.kl)
         # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        optimizer = tf.train.MomentumOptimizer(self.lr_ph, mom)
+        # optimizer = tf.train.MomentumOptimizer(self.lr_ph, mom)
+        optimizer = tf.train.AdamOptimizer(self.lr_ph)
         # with tf.control_dependencies(update_ops):
         self.train_op = optimizer.minimize(self.loss)
 

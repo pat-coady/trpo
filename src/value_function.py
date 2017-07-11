@@ -59,10 +59,11 @@ class ValueFunction(object):
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(2/64)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
-            self.out = tf.layers.dense(out, 1,
-                                       kernel_initializer=tf.random_normal_initializer(
-                                           stddev=np.sqrt(2/32)),
-                                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
+            out = tf.layers.dense(out, 1,
+                                  kernel_initializer=tf.random_normal_initializer(
+                                      stddev=np.sqrt(2/32)),
+                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
+            self.out = tf.squeeze(out)
             self.loss = tf.reduce_mean(tf.square(self.out - self.val))
             # self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
             optimizer = tf.train.MomentumOptimizer(self.lr, momentum=0.9, use_nesterov=False)

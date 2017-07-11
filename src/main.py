@@ -92,8 +92,7 @@ def add_disc_sum_rew(trajectories, gamma=1.0):
     :return: None (mutates trajectories to add 'disc_sum_rew' key)
     """
     for trajectory in trajectories:
-        # TODO: Handle scaling in a more principled way
-        rewards = trajectory['rewards']/200  # keep NN happy by scaling closer to 1
+        rewards = trajectory['rewards']
         disc_sum_rew = scipy.signal.lfilter([1.0], [1.0, -gamma], rewards[::-1])[::-1]
         trajectory['disc_sum_rew'] = disc_sum_rew
 
@@ -147,23 +146,23 @@ def disp_metrics(metrics):
     print('\n')
 
 
-def main(num_iter=300,
+def main(num_iter=500,
          gamma=0.97):
 
     desired_kl = 2e-3
-    lr = 1e-4
+    lr = 1e-3
     # launch ai gym env
     env, obs_dim, act_dim = init_gym()
 
     # init value function and policy
-    # val_func = ValueFunction(obs_dim)
-    val_func = LinearValueFunction()
+    val_func = ValueFunction(obs_dim)
+    # val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
     metrics = {}
     # main loop:
     for i in range(num_iter):
         # collect data batch using policy
-        trajectories = run_policy(env, policy, min_steps=1000)
+        trajectories = run_policy(env, policy, min_steps=2500)
         metrics['MeanRew'] = np.mean([t['rewards'].sum() for t in trajectories])
         # calculate cum_sum_rew: all time steps
         add_disc_sum_rew(trajectories, gamma)
@@ -173,9 +172,11 @@ def main(num_iter=300,
         add_advantage(trajectories)
         # policy update
         observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         metrics.update(policy.update(observes, actions, advantages, lr=lr))
         # fit value function
         metrics.update(val_func.fit(observes, disc_sum_rew))
+        metrics['iteration'] = i
         disp_metrics(metrics)
         # view policy
         # if (i + 1) % 25 == 0:
