@@ -26,13 +26,14 @@ class Policy(object):
         self.advantages_ph = tf.placeholder(tf.float32, (None,), 'advantages')
         self.training_ph = tf.placeholder(tf.bool, (), 'training')
         self.beta_ph = tf.placeholder(tf.float32, (), 'beta')
+        self.lr_ph = tf.placeholder(tf.float32, (), 'lr')
         self.old_log_vars_ph = tf.placeholder(tf.float32, (act_dim,), 'old_log_vars')
         self.old_means_ph = tf.placeholder(tf.float32, (None, act_dim), 'old_means')
 
     def _policy_nn(self, hid_units, obs_dim, act_dim):
         """ Neural net for policy approximation function """
-        normed = tf.layers.batch_normalization(self.obs_ph, training=self.training_ph)
-        hid1 = tf.layers.dense(normed, hid_units, tf.tanh,
+        # normed = tf.layers.batch_normalization(self.obs_ph, training=self.training_ph)
+        hid1 = tf.layers.dense(self.obs_ph, hid_units, tf.tanh,
                                kernel_initializer=tf.random_normal_initializer(
                                    stddev=(np.sqrt(2/obs_dim))),
                                name='hid1')
@@ -72,11 +73,10 @@ class Policy(object):
         self.sampled_act = (self.means +
                             tf.exp(self.log_vars / 2.0) * tf.random_normal(shape=(act_dim,)))
 
-    def _loss_train_op(self, lr=0.01, mom=0.9):
+    def _loss_train_op(self, mom=0.9):
         """
 
         Args:
-            lr:
             mom:
 
         Returns:
@@ -84,11 +84,11 @@ class Policy(object):
         """
         self.loss = tf.reduce_mean(self.advantages_ph * self.logp_act)
         # beta_ph: hyper-parameter to control weight of kl-divergence loss
-        self.loss += -tf.reduce_mean(self.beta_ph * self.kl)
+        # self.loss += -tf.reduce_mean(self.beta_ph * self.kl)
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        optimizer = tf.train.MomentumOptimizer(lr, mom)
-        with tf.control_dependencies(update_ops):
-            self.train_op = optimizer.minimize(-self.loss)
+        optimizer = tf.train.MomentumOptimizer(self.lr_ph, mom)
+        # with tf.control_dependencies(update_ops):
+        self.train_op = optimizer.minimize(-self.loss)
 
     def _init_session(self):
         """Launch TensorFlow session and initialize variables"""
@@ -102,10 +102,11 @@ class Policy(object):
 
         return self.sess.run(self.sampled_act, feed_dict=feed_dict)
 
-    def update(self, observes, actions, advantages, epochs=10, beta=10):
+    def update(self, observes, actions, advantages, epochs=1, beta=0.0001, lr=1e-4):
         """Perform policy update based on batch (size = N) of samples
 
         Args:
+            lr:
             observes:
             actions:
             advantages:
@@ -119,7 +120,8 @@ class Policy(object):
                      self.act_ph: actions,
                      self.advantages_ph: advantages,
                      self.beta_ph: beta,
-                     self.training_ph: False}
+                     self.training_ph: False,
+                     self.lr_ph: lr}
         old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
                                                       feed_dict)
         for e in range(epochs):
@@ -128,6 +130,7 @@ class Policy(object):
             feed_dict[self.old_means_ph] = old_means_np
             _, loss = self.sess.run([self.train_op, self.loss], feed_dict)
 
+        feed_dict[self.training_ph] = False
         loss, entropy, kl = self.sess.run([self.loss, self.entropy, self.kl], feed_dict)
         metrics = {'AvgLoss': loss,
                    'AvgEntropy': entropy,

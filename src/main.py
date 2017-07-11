@@ -91,7 +91,8 @@ def add_disc_sum_rew(trajectories, gamma=1.0):
     :return: None (mutates trajectories to add 'disc_sum_rew' key)
     """
     for trajectory in trajectories:
-        rewards = trajectory['rewards']
+        # TODO: Handle scaling in a more principled way
+        rewards = trajectory['rewards']/200  # keep NN happy by scaling closer to 1
         disc_sum_rew = scipy.signal.lfilter([1.0], [1.0, -gamma], rewards[::-1])[::-1]
         trajectory['disc_sum_rew'] = disc_sum_rew
 
@@ -142,16 +143,20 @@ def disp_metrics(metrics):
     """Print metrics to stdout"""
     for key in metrics:
         print(key, ' ', metrics[key])
+    print('\n')
 
 
 def main(num_iter=100,
-         gamma=1.0):
+         gamma=0.97):
 
+    desired_kl = 2e-3
+    lr = 1e-4
     # launch ai gym env
     env, obs_dim, act_dim = init_gym()
 
     # init value function and policy
-    val_func = ValueFunction(obs_dim)
+    # val_func = ValueFunction(obs_dim)
+    val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
     # main loop:
     for i in range(num_iter):
@@ -165,16 +170,24 @@ def main(num_iter=100,
         add_advantage(trajectories)
         # policy update
         observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
-        # print(observes.shape)
-        # print(actions.shape)
-        # print(advantages.shape)
         metrics = policy.update(observes, actions, advantages)
-        print(metrics)
         # fit value function
         metrics.update(val_func.fit(observes, disc_sum_rew))
         disp_metrics(metrics)
         # view policy
-        view_policy(env, policy)
+        # if (i + 1) % 25 == 0:
+        #     view_policy(env, policy)
+
+        kl = metrics['OldNewKL']
+        if kl > desired_kl * 2:
+            lr /= 1.5
+            print('lr -> %s' % lr)
+        elif kl < desired_kl / 2:
+            lr *= 1.5
+            print('lr -> %s' % lr)
+        else:
+            print('lr OK')
+
 
 if __name__ == "__main__":
     main()
