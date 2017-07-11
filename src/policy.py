@@ -46,12 +46,12 @@ class Policy(object):
 
     def _logprob(self, act_dim):
         """ Log probabilities of batch of states, actions"""
-        logp_act = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)
-        logp_act += -0.5 * tf.reduce_sum(self.log_vars)
-        logp_act += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.means) /
-                                         tf.exp(self.log_vars),
-                                         axis=1, keep_dims=True)
-        self.logp_act = logp_act
+        logp = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)
+        logp += -0.5 * tf.reduce_sum(self.log_vars)
+        logp += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.means) /
+                                     tf.exp(self.log_vars),
+                                     axis=1, keep_dims=True)
+        self.logp = logp
 
     def _kl_entropy(self, act_dim):
         """
@@ -82,13 +82,13 @@ class Policy(object):
         Returns:
 
         """
-        self.loss = tf.reduce_mean(self.advantages_ph * self.logp_act)
+        self.loss = -tf.reduce_mean(self.advantages_ph * self.logp)
         # beta_ph: hyper-parameter to control weight of kl-divergence loss
         # self.loss += -tf.reduce_mean(self.beta_ph * self.kl)
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         optimizer = tf.train.MomentumOptimizer(self.lr_ph, mom)
         # with tf.control_dependencies(update_ops):
-        self.train_op = optimizer.minimize(-self.loss)
+        self.train_op = optimizer.minimize(self.loss)
 
     def _init_session(self):
         """Launch TensorFlow session and initialize variables"""
@@ -132,6 +132,7 @@ class Policy(object):
 
         feed_dict[self.training_ph] = False
         loss, entropy, kl = self.sess.run([self.loss, self.entropy, self.kl], feed_dict)
+
         metrics = {'AvgLoss': loss,
                    'AvgEntropy': entropy,
                    'OldNewKL': kl}

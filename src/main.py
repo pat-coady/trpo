@@ -39,7 +39,8 @@ def run_episode(env, policy, animate=False):
     while not done:
         if animate:
             env.render()
-        obs = obs.reshape((1, -1))
+        # TODO: implement more principled way of scaling obs
+        obs = obs.reshape((1, -1))/3
         observes.append(obs)
         action = policy.sample(obs).reshape((1, -1))
         actions.append(action)
@@ -146,7 +147,7 @@ def disp_metrics(metrics):
     print('\n')
 
 
-def main(num_iter=100,
+def main(num_iter=300,
          gamma=0.97):
 
     desired_kl = 2e-3
@@ -158,10 +159,12 @@ def main(num_iter=100,
     # val_func = ValueFunction(obs_dim)
     val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
+    metrics = {}
     # main loop:
     for i in range(num_iter):
         # collect data batch using policy
         trajectories = run_policy(env, policy, min_steps=1000)
+        metrics['MeanRew'] = np.mean([t['rewards'].sum() for t in trajectories])
         # calculate cum_sum_rew: all time steps
         add_disc_sum_rew(trajectories, gamma)
         # value prediction: all time steps
@@ -170,7 +173,7 @@ def main(num_iter=100,
         add_advantage(trajectories)
         # policy update
         observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
-        metrics = policy.update(observes, actions, advantages)
+        metrics.update(policy.update(observes, actions, advantages, lr=lr))
         # fit value function
         metrics.update(val_func.fit(observes, disc_sum_rew))
         disp_metrics(metrics)
