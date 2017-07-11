@@ -17,8 +17,8 @@ class ValueFunction(object):
     def _build_graph(self):
         self.g = tf.Graph()
         with self.g.as_default():
-            self.obs = tf.placeholder(dtype=tf.float32, shape=(None, self.obs_dim))
-            self.val = tf.placeholder(dtype=tf.float32, shape=(None,))
+            self.obs = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
+            self.val = tf.placeholder(tf.float32, (None,), 'val_valfunc')
             out = tf.layers.dense(self.obs, 64, activation=tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(2 / self.obs_dim)),
@@ -54,7 +54,7 @@ class ValueFunction(object):
         y_hat = self.predict(x)
         loss = np.mean(np.square(y_hat-y))
 
-        return loss
+        return {'ValFuncLoss': loss}
 
     def predict(self, x):
         feed_dict = {self.obs: x}

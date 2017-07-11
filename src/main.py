@@ -23,10 +23,12 @@ def init_gym(env_name='Pendulum-v0'):
 def run_episode(env, policy, animate=False):
     """ Run single episode with option to animate
 
-    :param env: ai gym environment
-    :param policy: policy with "sample" method
-    :param animate: boolean, True uses env.render() method to animate episode
-    :return: 3-tuple of NumPy arrays
+    Args:
+        env: ai gym environment
+        policy: policy with "sample" method
+        animate: boolean, True uses env.render() method to animate episode
+
+    Returns: 3-tuple of NumPy arrays
         observes: shape = (episode len, obs_dim)
         actions: shape = (episode len, act_dim)
         rewards: shape = (episode len,)
@@ -37,13 +39,14 @@ def run_episode(env, policy, animate=False):
     while not done:
         if animate:
             env.render()
+        obs = obs.reshape((1, -1))
         observes.append(obs)
-        action = policy.sample(obs)
+        action = policy.sample(obs).reshape((1, -1))
         actions.append(action)
         obs, reward, done, _ = env.step(action)
         rewards.append(reward)
 
-    return np.array(observes), np.array(actions), np.array(rewards)
+    return np.concatenate(observes), np.concatenate(actions), np.concatenate(rewards)
 
 
 def run_policy(env, policy, min_steps):
@@ -105,7 +108,7 @@ def add_value(trajectories, val_func):
         trajectory['values'] = values
 
 
-def add_advantage(trajectories, val_func):
+def add_advantage(trajectories):
     """ Adds estimated advantage to all timesteps of all trajectories
 
     :param trajectories: as returned by run_policy()
@@ -153,7 +156,7 @@ def main(num_iter=100,
     # main loop:
     for i in range(num_iter):
         # collect data batch using policy
-        trajectories = run_policy(env, policy)
+        trajectories = run_policy(env, policy, min_steps=1000)
         # calculate cum_sum_rew: all time steps
         add_disc_sum_rew(trajectories, gamma)
         # value prediction: all time steps
@@ -162,11 +165,16 @@ def main(num_iter=100,
         add_advantage(trajectories)
         # policy update
         observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
+        # print(observes.shape)
+        # print(actions.shape)
+        # print(advantages.shape)
         metrics = policy.update(observes, actions, advantages)
+        print(metrics)
         # fit value function
         metrics.update(val_func.fit(observes, disc_sum_rew))
         disp_metrics(metrics)
         # view policy
         view_policy(env, policy)
 
-
+if __name__ == "__main__":
+    main()

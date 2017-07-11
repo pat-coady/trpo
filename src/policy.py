@@ -24,10 +24,10 @@ class Policy(object):
         self.obs_ph = tf.placeholder(tf.float32, (None, obs_dim), 'obs')
         self.act_ph = tf.placeholder(tf.float32, (None, act_dim), 'act')
         self.advantages_ph = tf.placeholder(tf.float32, (None,), 'advantages')
-        self.training_ph = tf.placeholder(tf.bool, (1,), 'training')
-        self.beta_ph = tf.placeholder(tf.float32, (1,), 'beta')
-        self.old_log_vars_ph = tf.placeholder(tf.float32, (act_dim,))
-        self.old_means_ph = tf.placeholder(tf.float32, (None, act_dim))
+        self.training_ph = tf.placeholder(tf.bool, (), 'training')
+        self.beta_ph = tf.placeholder(tf.float32, (), 'beta')
+        self.old_log_vars_ph = tf.placeholder(tf.float32, (act_dim,), 'old_log_vars')
+        self.old_means_ph = tf.placeholder(tf.float32, (None, act_dim), 'old_means')
 
     def _policy_nn(self, hid_units, obs_dim, act_dim):
         """ Neural net for policy approximation function """
@@ -91,31 +91,34 @@ class Policy(object):
             self.train_op = optimizer.minimize(-self.loss)
 
     def _init_session(self):
-        """ Launch TensorFlow session and initialize variables"""
+        """Launch TensorFlow session and initialize variables"""
         self.sess = tf.Session(graph=self.g)
         self.sess.run(self.init)
 
     def sample(self, obs):
-        """ Draw sample from policy distribution"""
+        """Draw sample from policy distribution"""
         feed_dict = {self.obs_ph: obs,
                      self.training_ph: False}
 
         return self.sess.run(self.sampled_act, feed_dict=feed_dict)
 
-    def update(self, observes, actions, advantages, epochs=10):
-        """ Perform policy update based on batch (size = N) of samples
+    def update(self, observes, actions, advantages, epochs=10, beta=10):
+        """Perform policy update based on batch (size = N) of samples
 
-        :param observes: NumPy shape = (N, obs_dim)
-        :param actions: NumPy shape = (N, act_dim)
-        :param advantages: NumPy shape = (N,)
-        :return: dictionary of metrics
-            'KLOldNew'
-            'Entropy'
-            'AvgLoss'
+        Args:
+            observes:
+            actions:
+            advantages:
+            epochs:
+            beta:
+
+        Returns:
+
         """
         feed_dict = {self.obs_ph: observes,
                      self.act_ph: actions,
                      self.advantages_ph: advantages,
+                     self.beta_ph: beta,
                      self.training_ph: False}
         old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
                                                       feed_dict)
@@ -125,9 +128,12 @@ class Policy(object):
             feed_dict[self.old_means_ph] = old_means_np
             _, loss = self.sess.run([self.train_op, self.loss], feed_dict)
 
-        loss, entropy, kl = self.sess.run([self.loss, self.entropy, self.kl])
+        loss, entropy, kl = self.sess.run([self.loss, self.entropy, self.kl], feed_dict)
+        metrics = {'AvgLoss': loss,
+                   'AvgEntropy': entropy,
+                   'OldNewKL': kl}
 
-        return loss, entropy, kl
+        return metrics
 
     def close_sess(self):
         self.sess.close()
