@@ -71,8 +71,9 @@ def run_policy(env, policy, min_steps):
                       'actions': actions,
                       'rewards': rewards}
         trajectories.append(trajectory)
+    metrics = {'MeanReward': np.mean([t['rewards'].sum() for t in trajectories])}
 
-    return trajectories
+    return metrics, trajectories
 
 
 def view_policy(env, policy):
@@ -102,6 +103,9 @@ def add_value(trajectories, val_func):
 
     :param trajectories: as returned by run_policy()
     :return: None (mutates trajectories to add 'values' key)
+
+    Args:
+        val_func:
     """
     for trajectory in trajectories:
         observes = trajectory['observes']
@@ -133,8 +137,10 @@ def build_train_set(trajectories):
     """
     observes = np.concatenate([t['observes'] for t in trajectories])
     actions = np.concatenate([t['actions'] for t in trajectories])
-    advantages = np.concatenate([t['advantages'] for t in trajectories])
     disc_sum_rew = np.concatenate([t['disc_sum_rew'] for t in trajectories])
+    advantages = np.concatenate([t['advantages'] for t in trajectories])
+    # normalize advantages
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
     return observes, actions, advantages, disc_sum_rew
 
@@ -149,48 +155,21 @@ def disp_metrics(metrics):
 def main(num_iter=500,
          gamma=0.97):
 
-    desired_kl = 2e-3
-    lr = 1e-3
-    # launch ai gym env
     env, obs_dim, act_dim = init_gym()
-
-    # init value function and policy
     val_func = ValueFunction(obs_dim)
-    # val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
-    metrics = {}
-    # main loop:
     for i in range(num_iter):
-        # collect data batch using policy
-        trajectories = run_policy(env, policy, min_steps=2500)
-        metrics['MeanRew'] = np.mean([t['rewards'].sum() for t in trajectories])
-        # calculate cum_sum_rew: all time steps
-        add_disc_sum_rew(trajectories, gamma)
-        # value prediction: all time steps
-        add_value(trajectories, val_func)
-        # calculate advantages: cum_sum_rew - v(s_t)
-        add_advantage(trajectories)
-        # policy update
-        observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-        metrics.update(policy.update(observes, actions, advantages, lr=lr))
-        # fit value function
-        metrics.update(val_func.fit(observes, disc_sum_rew))
+        metrics, trajectories = run_policy(env, policy, min_steps=2500)
         metrics['iteration'] = i
+        add_disc_sum_rew(trajectories, gamma)
+        add_value(trajectories, val_func)
+        add_advantage(trajectories)
+        observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
+        metrics.update(policy.update(observes, actions, advantages))
+        metrics.update(val_func.fit(observes, disc_sum_rew))
         disp_metrics(metrics)
-        # view policy
-        # if (i + 1) % 25 == 0:
-        #     view_policy(env, policy)
-
-        kl = metrics['OldNewKL']
-        if kl > desired_kl * 2:
-            lr /= 1.5
-            print('lr -> %s' % lr)
-        elif kl < desired_kl / 2:
-            lr *= 1.5
-            print('lr -> %s' % lr)
-        else:
-            print('lr OK')
+        if (i + 1) % 25 == 0:
+            view_policy(env, policy)
 
 
 if __name__ == "__main__":

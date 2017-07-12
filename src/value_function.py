@@ -33,7 +33,7 @@ class LinearValueFunction(object):
 
 class ValueFunction(object):
 
-    def __init__(self, obs_dim, epochs=10, reg=1e-4, lr=1e-4):
+    def __init__(self, obs_dim, epochs=10, reg=1e-2, lr=1e-4):
         self.obs_dim = obs_dim
         self.epochs = epochs
         self.reg = reg
@@ -47,13 +47,9 @@ class ValueFunction(object):
         with self.g.as_default():
             self.obs = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
             self.val = tf.placeholder(tf.float32, (None,), 'val_valfunc')
-            out = tf.layers.dense(self.obs, 128, activation=tf.tanh,
+            out = tf.layers.dense(self.obs, 64, activation=tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(2/self.obs_dim)),
-                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
-            out = tf.layers.dense(out, 64, activation=tf.tanh,
-                                  kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(2/128)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             out = tf.layers.dense(out, 32, activation=tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
@@ -65,8 +61,8 @@ class ValueFunction(object):
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             self.out = tf.squeeze(out)
             self.loss = tf.reduce_mean(tf.square(self.out - self.val))
-            # self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
-            optimizer = tf.train.MomentumOptimizer(self.lr, momentum=0.9, use_nesterov=False)
+            self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
+            optimizer = tf.train.MomentumOptimizer(self.lr, momentum=0.9, use_nesterov=True)
             self.train_op = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
         self.sess = tf.Session(graph=self.g)
