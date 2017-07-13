@@ -1,4 +1,5 @@
 import gym
+from gym import wrappers
 from policy import *
 from value_function import *
 import scipy.signal
@@ -40,14 +41,20 @@ def run_episode(env, policy, animate=False):
         if animate:
             env.render()
         # TODO: implement more principled way of scaling obs
-        obs = obs.reshape((1, -1))/3
+        obs = obs.astype(np.float64).reshape((1, -1))/3
         observes.append(obs)
-        action = policy.sample(obs).reshape((1, -1))
+        action = policy.sample(obs).reshape((1, -1)).astype(np.float32)
         actions.append(action)
         obs, reward, done, _ = env.step(action)
+        if not isinstance(reward, float):
+            reward = np.asscalar(reward)
         rewards.append(reward)
 
-    return np.concatenate(observes), np.concatenate(actions), np.concatenate(rewards)
+    obss = np.concatenate(observes)
+    if obss.dtype == 'object':
+        print(observes)
+
+    return np.concatenate(observes), np.concatenate(actions), np.array(rewards, dtype=np.float64)
 
 
 def run_policy(env, policy, min_steps):
@@ -66,11 +73,18 @@ def run_policy(env, policy, min_steps):
     trajectories = []
     while total_steps < min_steps:
         observes, actions, rewards = run_episode(env, policy)
+        # print(observes.dtype)
+        # print(observes.shape)
+        # print(actions.dtype)
+        # print(actions.shape)
+        # print(rewards.dtype)
+        # print(rewards.shape)
         total_steps += observes.shape[0]
         trajectory = {'observes': observes,
                       'actions': actions,
                       'rewards': rewards}
         trajectories.append(trajectory)
+    print(total_steps)
     metrics = {'MeanReward': np.mean([t['rewards'].sum() for t in trajectories])}
 
     return metrics, trajectories
@@ -152,11 +166,12 @@ def disp_metrics(metrics):
     print('\n')
 
 
-def main(num_iter=500,
+def main(num_iter=2000,
          gamma=0.97):
 
-    env, obs_dim, act_dim = init_gym()
-    val_func = ValueFunction(obs_dim)
+    env, obs_dim, act_dim = init_gym('InvertedDoublePendulum-v1')
+    env = wrappers.Monitor(env, '/tmp/inverted-double-experiment-1', force=True)
+    val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
     for i in range(num_iter):
         metrics, trajectories = run_policy(env, policy, min_steps=2500)
@@ -168,9 +183,10 @@ def main(num_iter=500,
         metrics.update(policy.update(observes, actions, advantages))
         metrics.update(val_func.fit(observes, disc_sum_rew))
         disp_metrics(metrics)
-        if (i + 1) % 25 == 0:
-            view_policy(env, policy)
+        # if (i + 1) % 25 == 0:
+        #     view_policy(env, policy)
 
 
 if __name__ == "__main__":
     main()
+

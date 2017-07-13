@@ -3,7 +3,9 @@ import tensorflow as tf
 
 
 class Policy(object):
-    def __init__(self, obs_dim, act_dim):
+    def __init__(self, obs_dim, act_dim, kl_targ=0.003):
+        self.beta = 1.0
+        self.kl_targ = kl_targ
         self._build_graph(obs_dim, act_dim)
         self._init_session()
 
@@ -80,7 +82,7 @@ class Policy(object):
         self.loss = -tf.reduce_mean(self.advantages_ph *
                                     tf.exp(self.logp - self.logp_old))
         self.loss += tf.reduce_mean(self.beta_ph * self.kl)
-        optimizer = tf.train.AdamOptimizer(self.lr_ph)
+        optimizer = tf.train.AdamOptimizer(0.003)
         self.train_op = optimizer.minimize(self.loss)
 
     def _init_session(self):
@@ -94,18 +96,24 @@ class Policy(object):
 
         return self.sess.run(self.sampled_act, feed_dict=feed_dict)
 
-    def update(self, observes, actions, advantages, epochs=20, beta=1, lr=1e-2):
+    def update(self, observes, actions, advantages, epochs=50):
         feed_dict = {self.obs_ph: observes,
                      self.act_ph: actions,
                      self.advantages_ph: advantages,
-                     self.beta_ph: beta,
-                     self.lr_ph: lr}
+                     self.beta_ph: self.beta}
         old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
                                                       feed_dict)
         for e in range(epochs):
             feed_dict[self.old_log_vars_ph] = old_log_vars_np
             feed_dict[self.old_means_ph] = old_means_np
             _, loss, kl = self.sess.run([self.train_op, self.loss, self.kl], feed_dict)
+            if kl > self.kl_targ * 4:
+                break
+        if kl > self.kl_targ * 2:
+            self.beta *= 1.5
+        elif kl < self.kl_targ / 2:
+            self.beta /= 1.5
+
 
         loss, entropy, kl = self.sess.run([self.loss, self.entropy, self.kl], feed_dict)
 

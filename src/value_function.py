@@ -7,6 +7,9 @@ class LinearValueFunction(object):
     coef = None
 
     def fit(self, x, y):
+        y_hat = self.predict(x)
+        loss = np.mean(np.square(y_hat-y))
+        old_exp_var = 1-np.var(y-y_hat)/np.var(y)
         xp = self.preproc(x)
         a = xp.T.dot(xp)
         nfeats = xp.shape[1]
@@ -18,7 +21,8 @@ class LinearValueFunction(object):
         exp_var = 1-np.var(y-y_hat)/np.var(y)
 
         return {'ValFuncLoss': loss,
-                'ExplainedVar': exp_var}
+                'ExplainedVar': exp_var,
+                'OldExplainedVar': old_exp_var}
 
     def predict(self, X):
         if self.coef is None:
@@ -33,7 +37,7 @@ class LinearValueFunction(object):
 
 class ValueFunction(object):
 
-    def __init__(self, obs_dim, epochs=10, reg=1e-2, lr=1e-4):
+    def __init__(self, obs_dim, epochs=5, reg=1e-2, lr=1e-4):
         self.obs_dim = obs_dim
         self.epochs = epochs
         self.reg = reg
