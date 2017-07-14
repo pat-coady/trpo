@@ -30,6 +30,7 @@ class Policy(object):
         self.lr_ph = tf.placeholder(tf.float32, (), 'lr')
         self.old_log_vars_ph = tf.placeholder(tf.float32, (act_dim,), 'old_log_vars')
         self.old_means_ph = tf.placeholder(tf.float32, (None, act_dim), 'old_means')
+        self.training_ph = tf.placeholder(tf.bool, (), 'training')
 
     def _policy_nn(self, obs_dim, act_dim):
         """ Neural net for policy approximation function """
@@ -103,17 +104,18 @@ class Policy(object):
                      self.beta_ph: self.beta}
         old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
                                                       feed_dict)
+        feed_dict[self.old_log_vars_ph] = old_log_vars_np
+        feed_dict[self.old_means_ph] = old_means_np
         for e in range(epochs):
-            feed_dict[self.old_log_vars_ph] = old_log_vars_np
-            feed_dict[self.old_means_ph] = old_means_np
             _, loss, kl = self.sess.run([self.train_op, self.loss, self.kl], feed_dict)
+            if e % 5 == 0:
+                print(loss, kl)
             if kl > self.kl_targ * 4:
                 break
         if kl > self.kl_targ * 2:
             self.beta *= 1.5
         elif kl < self.kl_targ / 2:
             self.beta /= 1.5
-
 
         loss, entropy, kl = self.sess.run([self.loss, self.entropy, self.kl], feed_dict)
 

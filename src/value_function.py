@@ -8,7 +8,6 @@ class LinearValueFunction(object):
 
     def fit(self, x, y):
         y_hat = self.predict(x)
-        loss = np.mean(np.square(y_hat-y))
         old_exp_var = 1-np.var(y-y_hat)/np.var(y)
         xp = self.preproc(x)
         a = xp.T.dot(xp)
@@ -49,9 +48,11 @@ class ValueFunction(object):
     def _build_graph(self):
         self.g = tf.Graph()
         with self.g.as_default():
-            self.obs = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
-            self.val = tf.placeholder(tf.float32, (None,), 'val_valfunc')
-            out = tf.layers.dense(self.obs, 64, activation=tf.tanh,
+            self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
+            self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
+            scale = tf.get_variable('scale', shape=(),
+                                    initializer=tf.constant_initializer(1.0))
+            out = tf.layers.dense(self.obs_ph, 64, activation=tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(2/self.obs_dim)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
@@ -63,8 +64,8 @@ class ValueFunction(object):
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(2/32)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
-            self.out = tf.squeeze(out)
-            self.loss = tf.reduce_mean(tf.square(self.out - self.val))
+            self.out = tf.squeeze(out) * scale
+            self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
             self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
             optimizer = tf.train.MomentumOptimizer(self.lr, momentum=0.9, use_nesterov=True)
             self.train_op = optimizer.minimize(self.loss)
@@ -73,24 +74,27 @@ class ValueFunction(object):
         self.sess.run(self.init)
 
     def fit(self, x, y):
-        batch_size = 64
+        y_hat = self.predict(x)
+        old_exp_var = 1-np.var(y-y_hat)/np.var(y)
+        batch_size = 128
         for e in range(self.epochs):
             x, y = shuffle(x, y)
             for j in range(x.shape[0] // batch_size):
                 start = j*batch_size
                 end = (j+1)*batch_size
-                feed_dict = {self.obs: x[start:end, :],
-                             self.val: y[start:end]}
+                feed_dict = {self.obs_ph: x[start:end, :],
+                             self.val_ph: y[start:end]}
                 _, l = self.sess.run([self.train_op, self.loss], feed_dict=feed_dict)
         y_hat = self.predict(x)
         loss = np.mean(np.square(y_hat-y))
         exp_var = 1-np.var(y-y_hat)/np.var(y)
 
         return {'ValFuncLoss': loss,
-                'ExplainedVar': exp_var}
+                'ExplainedVar': exp_var,
+                'OldExplainedVar': old_exp_var}
 
     def predict(self, x):
-        feed_dict = {self.obs: x}
+        feed_dict = {self.obs_ph: x}
         y_hat = self.sess.run(self.out, feed_dict=feed_dict)
 
         return np.squeeze(y_hat)

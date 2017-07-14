@@ -40,19 +40,14 @@ def run_episode(env, policy, animate=False):
     while not done:
         if animate:
             env.render()
-        # TODO: implement more principled way of scaling obs
-        obs = obs.astype(np.float64).reshape((1, -1))/3
+        obs = obs.astype(np.float64).reshape((1, -1))/3.0
         observes.append(obs)
-        action = policy.sample(obs).reshape((1, -1)).astype(np.float32)
+        action = policy.sample(obs).reshape((1, -1)).astype(np.float64)
         actions.append(action)
         obs, reward, done, _ = env.step(action)
         if not isinstance(reward, float):
             reward = np.asscalar(reward)
         rewards.append(reward)
-
-    obss = np.concatenate(observes)
-    if obss.dtype == 'object':
-        print(observes)
 
     return np.concatenate(observes), np.concatenate(actions), np.array(rewards, dtype=np.float64)
 
@@ -73,18 +68,11 @@ def run_policy(env, policy, min_steps):
     trajectories = []
     while total_steps < min_steps:
         observes, actions, rewards = run_episode(env, policy)
-        # print(observes.dtype)
-        # print(observes.shape)
-        # print(actions.dtype)
-        # print(actions.shape)
-        # print(rewards.dtype)
-        # print(rewards.shape)
         total_steps += observes.shape[0]
         trajectory = {'observes': observes,
                       'actions': actions,
                       'rewards': rewards}
         trajectories.append(trajectory)
-    print(total_steps)
     metrics = {'MeanReward': np.mean([t['rewards'].sum() for t in trajectories])}
 
     return metrics, trajectories
@@ -105,6 +93,9 @@ def add_disc_sum_rew(trajectories, gamma=1.0):
 
     :param trajectories: as returned by run_policy()
     :return: None (mutates trajectories to add 'disc_sum_rew' key)
+
+    Args:
+        gamma:
     """
     for trajectory in trajectories:
         rewards = trajectory['rewards']
@@ -169,7 +160,7 @@ def disp_metrics(metrics):
 def main(num_iter=2000,
          gamma=0.97):
 
-    env, obs_dim, act_dim = init_gym('InvertedDoublePendulum-v1')
+    env, obs_dim, act_dim = init_gym('InvertedPendulum-v1')
     env = wrappers.Monitor(env, '/tmp/inverted-double-experiment-1', force=True)
     val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
