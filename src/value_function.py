@@ -19,9 +19,9 @@ class LinearValueFunction(object):
         loss = np.mean(np.square(y_hat-y))
         exp_var = 1-np.var(y-y_hat)/np.var(y)
 
-        return {'ValFuncLoss': loss,
-                'ExplainedVar': exp_var,
-                'OldExplainedVar': old_exp_var}
+        return {'LinValFuncLoss': loss,
+                'LinExplainedVarNew': exp_var,
+                'LinExplainedVarOld': old_exp_var}
 
     def predict(self, X):
         if self.coef is None:
@@ -36,7 +36,7 @@ class LinearValueFunction(object):
 
 class ValueFunction(object):
 
-    def __init__(self, obs_dim, epochs=5, reg=1e-2, lr=1e-4):
+    def __init__(self, obs_dim, epochs=5, reg=1e-3, lr=1e-4):
         self.obs_dim = obs_dim
         self.epochs = epochs
         self.reg = reg
@@ -90,8 +90,8 @@ class ValueFunction(object):
         exp_var = 1-np.var(y-y_hat)/np.var(y)
 
         return {'ValFuncLoss': loss,
-                'ExplainedVar': exp_var,
-                'OldExplainedVar': old_exp_var}
+                'ExplainedVarNew': exp_var,
+                'ExplainedVarOld': old_exp_var}
 
     def predict(self, x):
         feed_dict = {self.obs_ph: x}

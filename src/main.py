@@ -52,7 +52,7 @@ def run_episode(env, policy, animate=False):
     return np.concatenate(observes), np.concatenate(actions), np.array(rewards, dtype=np.float64)
 
 
-def run_policy(env, policy, min_steps):
+def run_policy(env, policy, min_steps, min_episodes):
     """ Run policy and collect data for a minimum of min_steps
 
     :param env: ai gym environment
@@ -64,18 +64,20 @@ def run_policy(env, policy, min_steps):
         'actions' : NumPy array of actions from episode
         'rewards' : NumPy array of (undiscounted) rewards from episode
     """
-    total_steps = 0
+    steps, episodes = (0, 0)
     trajectories = []
-    while total_steps < min_steps:
+    while not (steps >= min_steps and episodes >= min_episodes):
         observes, actions, rewards = run_episode(env, policy)
-        total_steps += observes.shape[0]
+        steps += observes.shape[0]
+        episodes += 1
         trajectory = {'observes': observes,
                       'actions': actions,
                       'rewards': rewards}
         trajectories.append(trajectory)
-    metrics = {'MeanReward': np.mean([t['rewards'].sum() for t in trajectories])}
+    log = {'MeanReward': np.mean([t['rewards'].sum() for t in trajectories]),
+           'Steps': steps}
 
-    return metrics, trajectories
+    return log, trajectories
 
 
 def view_policy(env, policy):
@@ -98,12 +100,12 @@ def add_disc_sum_rew(trajectories, gamma=1.0):
         gamma:
     """
     for trajectory in trajectories:
-        rewards = trajectory['rewards']
+        rewards = trajectory['rewards'] * (1 - gamma)
         disc_sum_rew = scipy.signal.lfilter([1.0], [1.0, -gamma], rewards[::-1])[::-1]
         trajectory['disc_sum_rew'] = disc_sum_rew
 
 
-def add_value(trajectories, val_func):
+def add_value(trajectories, val_func, gamma):
     """ Adds estimated value to all timesteps of all trajectories
 
     :param trajectories: as returned by run_policy()
@@ -150,30 +152,49 @@ def build_train_set(trajectories):
     return observes, actions, advantages, disc_sum_rew
 
 
-def disp_metrics(metrics):
+def disp_log(log):
     """Print metrics to stdout"""
-    for key in metrics:
-        print(key, ' ', metrics[key])
+    log_keys = [k for k in log.keys()]
+    log_keys.sort()
+    print('***** Iteration {}, Mean R = {:.0f} *****'.format(log['Iteration'],
+                                                             log['MeanReward']))
+    for key in log_keys:
+        if key != 'Iteration' and key != 'MeanReward':
+            print('{:s}: {:.3g}'.format(key, log[key]))
     print('\n')
 
 
 def main(num_iter=2000,
-         gamma=0.97):
+         gamma=0.995):
 
-    env, obs_dim, act_dim = init_gym('InvertedPendulum-v1')
-    env = wrappers.Monitor(env, '/tmp/inverted-double-experiment-1', force=True)
-    val_func = LinearValueFunction()
+    env, obs_dim, act_dim = init_gym('Hopper-v1')
+    env = wrappers.Monitor(env, '/tmp/hopper-experiment-1', force=True)
+    val_func = ValueFunction(obs_dim)
+    lin_val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
     for i in range(num_iter):
-        metrics, trajectories = run_policy(env, policy, min_steps=2500)
-        metrics['iteration'] = i
+        log, trajectories = run_policy(env, policy, min_steps=1000, min_episodes=5)
+        log['Iteration'] = i
+        add_value(trajectories, val_func, gamma)
         add_disc_sum_rew(trajectories, gamma)
-        add_value(trajectories, val_func)
         add_advantage(trajectories)
         observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
-        metrics.update(policy.update(observes, actions, advantages))
-        metrics.update(val_func.fit(observes, disc_sum_rew))
-        disp_metrics(metrics)
+        print('mean: {:.3f}, min: {:.3f}, max: {:.3f}, std: {:.3f}'.format(
+            np.mean(observes), np.min(observes),
+            np.max(observes), np.std(observes)))
+        print('mean: {:.3f}, min: {:.3f}, max: {:.3f}, std: {:.3f}'.format(
+            np.mean(actions), np.min(actions),
+            np.max(actions), np.std(actions)))
+        print('mean: {:.3f}, min: {:.3f}, max: {:.3f}, std: {:.3f}'.format(
+            np.mean(disc_sum_rew), np.min(disc_sum_rew),
+            np.max(disc_sum_rew), np.std(disc_sum_rew)))
+        print('mean: {:.3f}, min: {:.3f}, max: {:.3f}, std: {:.3f}'.format(
+            np.mean(advantages), np.min(advantages),
+            np.max(advantages), np.std(advantages)))
+        log.update(policy.update(observes, actions, advantages))
+        log.update(val_func.fit(observes, disc_sum_rew))
+        log.update(lin_val_func.fit(observes, disc_sum_rew))
+        disp_log(log)
         # if (i + 1) % 25 == 0:
         #     view_policy(env, policy)
 

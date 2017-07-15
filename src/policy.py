@@ -27,21 +27,27 @@ class Policy(object):
         self.act_ph = tf.placeholder(tf.float32, (None, act_dim), 'act')
         self.advantages_ph = tf.placeholder(tf.float32, (None,), 'advantages')
         self.beta_ph = tf.placeholder(tf.float32, (), 'beta')
-        self.lr_ph = tf.placeholder(tf.float32, (), 'lr')
         self.old_log_vars_ph = tf.placeholder(tf.float32, (act_dim,), 'old_log_vars')
         self.old_means_ph = tf.placeholder(tf.float32, (None, act_dim), 'old_means')
-        self.training_ph = tf.placeholder(tf.bool, (), 'training')
 
     def _policy_nn(self, obs_dim, act_dim):
         """ Neural net for policy approximation function """
-        out = tf.layers.dense(self.obs_ph, 30, tf.nn.tanh,
+        out = tf.layers.dense(self.obs_ph, 100, tf.nn.tanh,
                               kernel_initializer=tf.random_normal_initializer(
                                   stddev=np.sqrt(2 / obs_dim)),
                               name="h1")
+        out = tf.layers.dense(out, 50, tf.nn.tanh,
+                              kernel_initializer=tf.random_normal_initializer(
+                                  stddev=np.sqrt(2 / 100)),
+                              name="h2")
+        out = tf.layers.dense(out, 25, tf.nn.tanh,
+                              kernel_initializer=tf.random_normal_initializer(
+                                  stddev=np.sqrt(2 / 50)),
+                              name="h3")
         self.means = tf.layers.dense(out, act_dim,
                                      kernel_initializer=tf.random_normal_initializer(
-                                         stddev=np.sqrt(2 / 30)),
-                                     name="mu")
+                                         stddev=np.sqrt(2 / 25)),
+                                     name="mean_action")
         self.log_vars = tf.get_variable("log_vars", (act_dim,),
                                         initializer=tf.constant_initializer(0.0))
 
@@ -80,10 +86,11 @@ class Policy(object):
                             tf.exp(self.log_vars / 2.0) * tf.random_normal(shape=(act_dim,)))
 
     def _loss_train_op(self):
-        self.loss = -tf.reduce_mean(self.advantages_ph *
+        self.loss1 = -tf.reduce_mean(self.advantages_ph *
                                     tf.exp(self.logp - self.logp_old))
-        self.loss += tf.reduce_mean(self.beta_ph * self.kl)
-        optimizer = tf.train.AdamOptimizer(0.003)
+        self.loss2 = tf.reduce_mean(self.beta_ph * self.kl)
+        self.loss = self.loss1 + self.loss2
+        optimizer = tf.train.AdamOptimizer(0.0003)
         self.train_op = optimizer.minimize(self.loss)
 
     def _init_session(self):
@@ -97,7 +104,7 @@ class Policy(object):
 
         return self.sess.run(self.sampled_act, feed_dict=feed_dict)
 
-    def update(self, observes, actions, advantages, epochs=50):
+    def update(self, observes, actions, advantages, epochs=20):
         feed_dict = {self.obs_ph: observes,
                      self.act_ph: actions,
                      self.advantages_ph: advantages,
@@ -108,8 +115,6 @@ class Policy(object):
         feed_dict[self.old_means_ph] = old_means_np
         for e in range(epochs):
             _, loss, kl = self.sess.run([self.train_op, self.loss, self.kl], feed_dict)
-            if e % 5 == 0:
-                print(loss, kl)
             if kl > self.kl_targ * 4:
                 break
         if kl > self.kl_targ * 2:
@@ -119,9 +124,10 @@ class Policy(object):
 
         loss, entropy, kl = self.sess.run([self.loss, self.entropy, self.kl], feed_dict)
 
-        metrics = {'AvgLoss': loss,
-                   'AvgEntropy': entropy,
-                   'OldNewKL': kl}
+        metrics = {'PolicyLoss': loss,
+                   'PolicyEntropy': entropy,
+                   'KL': kl,
+                   'Beta': self.beta}
 
         return metrics
 
