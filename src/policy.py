@@ -27,7 +27,7 @@ class Policy(object):
         self.act_ph = tf.placeholder(tf.float32, (None, act_dim), 'act')
         self.advantages_ph = tf.placeholder(tf.float32, (None,), 'advantages')
         self.beta_ph = tf.placeholder(tf.float32, (), 'beta')
-        self.old_log_vars_ph = tf.placeholder(tf.float32, (act_dim,), 'old_log_vars')
+        self.old_log_vars_ph = tf.placeholder(tf.float32, (None, act_dim,), 'old_log_vars')
         self.old_means_ph = tf.placeholder(tf.float32, (None, act_dim), 'old_means')
 
     def _policy_nn(self, obs_dim, act_dim):
@@ -47,20 +47,22 @@ class Policy(object):
         self.means = tf.layers.dense(out, act_dim,
                                      kernel_initializer=tf.random_normal_initializer(
                                          stddev=np.sqrt(2 / 25)),
-                                     name="mean_action")
-        self.log_vars = tf.get_variable("log_vars", (act_dim,),
-                                        initializer=tf.constant_initializer(0.0))
+                                     name="means")
+        self.log_vars = tf.layers.dense(out, act_dim,
+                                        kernel_initializer=tf.random_normal_initializer(
+                                            stddev=np.sqrt(2 / 25)),
+                                        name="log_vars")
 
     def _logprob(self, act_dim):
         """ Log probabilities of batch of states, actions"""
         logp = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)
-        logp += -0.5 * tf.reduce_sum(self.log_vars)
+        logp += -0.5 * tf.reduce_sum(self.log_vars, axis=1)
         logp += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.means) /
                                      tf.exp(self.log_vars), axis=1)
         self.logp = logp
 
         logp_old = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)
-        logp_old += -0.5 * tf.reduce_sum(self.old_log_vars_ph)
+        logp_old += -0.5 * tf.reduce_sum(self.old_log_vars_ph, axis=1)
         logp_old += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.old_means_ph) /
                                          tf.exp(self.old_log_vars_ph), axis=1)
         self.logp_old = logp_old
@@ -70,15 +72,17 @@ class Policy(object):
         Add KL divergence between old and new distributions
         Add entropy of present policy given states and actions
         """
-        det_cov_old = tf.exp(tf.reduce_sum(self.old_log_vars_ph))
-        det_cov_new = tf.exp(tf.reduce_sum(self.log_vars))
-        tr_old_new = tf.reduce_sum(tf.exp(self.old_log_vars_ph - self.log_vars))
+        log_det_cov_old = tf.reduce_sum(self.old_log_vars_ph, axis=1)
+        log_det_cov_new = tf.reduce_sum(self.log_vars, axis=1)
+        tr_old_new = tf.reduce_sum(tf.exp(self.old_log_vars_ph - self.log_vars), axis=1)
 
-        self.kl = 0.5 * (tf.log(det_cov_new) - tf.log(det_cov_old) + tr_old_new +
-                         tf.reduce_mean(tf.square(self.means - self.old_means_ph) /
-                                        tf.exp(self.log_vars)) - act_dim)
+        # TODO: double-check kl implemented correctly
+        self.kl = 0.5 * tf.reduce_mean(log_det_cov_new - log_det_cov_old + tr_old_new +
+                                       tf.reduce_sum(tf.square(self.means - self.old_means_ph) /
+                                                     tf.exp(self.log_vars), axis=1) - act_dim)
+
         self.entropy = 0.5 * (act_dim * (np.log(2 * np.pi) + 1) +
-                              tf.reduce_mean(self.log_vars))
+                              tf.reduce_mean(tf.reduce_sum(self.log_vars, axis=1)))
 
     def _sample(self, act_dim):
         """ Sample from distribution, given observation"""
@@ -86,7 +90,8 @@ class Policy(object):
                             tf.exp(self.log_vars / 2.0) * tf.random_normal(shape=(act_dim,)))
 
     def _loss_train_op(self):
-        self.loss1 = -tf.reduce_sum(self.advantages_ph *
+        # TODO: use reduce_mean or reduce_sum?
+        self.loss1 = -tf.reduce_mean(self.advantages_ph *
                                     tf.exp(self.logp - self.logp_old))
         self.loss2 = tf.reduce_mean(self.beta_ph * self.kl)
         self.loss = self.loss1 + self.loss2

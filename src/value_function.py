@@ -36,7 +36,9 @@ class LinearValueFunction(object):
 
 class ValueFunction(object):
 
-    def __init__(self, obs_dim, epochs=5, reg=3e-5, lr=1e-5):
+    def __init__(self, obs_dim, epochs=5, reg=3e-5, lr=1e-3):
+        self.replay_buffer_x = None
+        self.replay_buffer_y = None
         self.obs_dim = obs_dim
         self.epochs = epochs
         self.reg = reg
@@ -76,16 +78,22 @@ class ValueFunction(object):
         self.sess.run(self.init)
 
     def fit(self, x, y):
+        if self.replay_buffer_x is None:
+            self.replay_buffer_x = x
+            self.replay_buffer_y = y
+        else:
+            self.replay_buffer_x = np.concatenate([x, self.replay_buffer_x[:40000, :]])
+            self.replay_buffer_y = np.concatenate([y, self.replay_buffer_y[:40000]])
         y_hat = self.predict(x)
         old_exp_var = 1-np.var(y-y_hat)/np.var(y)
-        batch_size = 128
+        batch_size = 256
         for e in range(self.epochs):
-            x, y = shuffle(x, y)
+            x_train, y_train = shuffle(self.replay_buffer_x, self.replay_buffer_y)
             for j in range(x.shape[0] // batch_size):
                 start = j*batch_size
                 end = (j+1)*batch_size
-                feed_dict = {self.obs_ph: x[start:end, :],
-                             self.val_ph: y[start:end]}
+                feed_dict = {self.obs_ph: x_train[start:end, :],
+                             self.val_ph: y_train[start:end]}
                 _, l = self.sess.run([self.train_op, self.loss], feed_dict=feed_dict)
         y_hat = self.predict(x)
         loss = np.mean(np.square(y_hat-y))

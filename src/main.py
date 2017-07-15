@@ -37,10 +37,12 @@ def run_episode(env, policy, animate=False):
     obs = env.reset()
     observes, actions, rewards = [], [], []
     done = False
+    step = 0
     while not done:
         if animate:
             env.render()
         obs = obs.astype(np.float64).reshape((1, -1))/3.0
+        obs = np.append(obs, [[step/2000]], axis=1)
         observes.append(obs)
         action = policy.sample(obs).reshape((1, -1)).astype(np.float64)
         actions.append(action)
@@ -48,6 +50,7 @@ def run_episode(env, policy, animate=False):
         if not isinstance(reward, float):
             reward = np.asscalar(reward)
         rewards.append(reward)
+        step += 1
 
     return np.concatenate(observes), np.concatenate(actions), np.array(rewards, dtype=np.float64)
 
@@ -167,8 +170,9 @@ def disp_log(log):
 def main(num_iter=5000,
          gamma=0.995):
 
-    env, obs_dim, act_dim = init_gym('InvertedDoublePendulum-v1')
-    env = wrappers.Monitor(env, '/tmp/pendulum-experiment-1', force=True)
+    env, obs_dim, act_dim = init_gym('Hopper-v1')
+    obs_dim += 1
+    env = wrappers.Monitor(env, '/tmp/hopper-experiment-1', force=True)
     val_func = ValueFunction(obs_dim)
     lin_val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
