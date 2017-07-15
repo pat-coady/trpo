@@ -36,7 +36,7 @@ class LinearValueFunction(object):
 
 class ValueFunction(object):
 
-    def __init__(self, obs_dim, epochs=5, reg=1e-3, lr=1e-4):
+    def __init__(self, obs_dim, epochs=5, reg=3e-5, lr=1e-5):
         self.obs_dim = obs_dim
         self.epochs = epochs
         self.reg = reg
@@ -50,21 +50,23 @@ class ValueFunction(object):
         with self.g.as_default():
             self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
             self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
-            scale = tf.get_variable('scale', shape=(),
-                                    initializer=tf.constant_initializer(1.0))
-            out = tf.layers.dense(self.obs_ph, 64, activation=tf.tanh,
+            out = tf.layers.dense(self.obs_ph, 100, activation=tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(2/self.obs_dim)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
-            out = tf.layers.dense(out, 32, activation=tf.tanh,
+            out = tf.layers.dense(out, 50, activation=tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(2/64)),
+                                      stddev=np.sqrt(2/100)),
+                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
+            out = tf.layers.dense(out, 25, activation=tf.tanh,
+                                  kernel_initializer=tf.random_normal_initializer(
+                                      stddev=np.sqrt(2 / 50)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             out = tf.layers.dense(out, 1,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(2/32)),
+                                      stddev=np.sqrt(2/25)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
-            self.out = tf.squeeze(out) * scale
+            self.out = tf.squeeze(out)
             self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
             self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
             optimizer = tf.train.MomentumOptimizer(self.lr, momentum=0.9, use_nesterov=True)

@@ -86,7 +86,7 @@ class Policy(object):
                             tf.exp(self.log_vars / 2.0) * tf.random_normal(shape=(act_dim,)))
 
     def _loss_train_op(self):
-        self.loss1 = -tf.reduce_mean(self.advantages_ph *
+        self.loss1 = -tf.reduce_sum(self.advantages_ph *
                                     tf.exp(self.logp - self.logp_old))
         self.loss2 = tf.reduce_mean(self.beta_ph * self.kl)
         self.loss = self.loss1 + self.loss2

@@ -164,16 +164,16 @@ def disp_log(log):
     print('\n')
 
 
-def main(num_iter=2000,
+def main(num_iter=5000,
          gamma=0.995):
 
-    env, obs_dim, act_dim = init_gym('Hopper-v1')
-    env = wrappers.Monitor(env, '/tmp/hopper-experiment-1', force=True)
+    env, obs_dim, act_dim = init_gym('InvertedDoublePendulum-v1')
+    env = wrappers.Monitor(env, '/tmp/pendulum-experiment-1', force=True)
     val_func = ValueFunction(obs_dim)
     lin_val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
     for i in range(num_iter):
-        log, trajectories = run_policy(env, policy, min_steps=1000, min_episodes=5)
+        log, trajectories = run_policy(env, policy, min_steps=2000, min_episodes=10)
         log['Iteration'] = i
         add_value(trajectories, val_func, gamma)
         add_disc_sum_rew(trajectories, gamma)
