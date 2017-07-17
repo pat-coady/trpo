@@ -36,7 +36,7 @@ class LinearValueFunction(object):
 
 class ValueFunction(object):
 
-    def __init__(self, obs_dim, epochs=5, reg=3e-5, lr=1e-3):
+    def __init__(self, obs_dim, epochs=5, reg=3e-5, lr=1e-2):
         self.replay_buffer_x = None
         self.replay_buffer_y = None
         self.obs_dim = obs_dim
@@ -54,19 +54,19 @@ class ValueFunction(object):
             self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
             out = tf.layers.dense(self.obs_ph, 100, activation=tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(2/self.obs_dim)),
+                                      stddev=np.sqrt(1 / self.obs_dim)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             out = tf.layers.dense(out, 50, activation=tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(2/100)),
+                                      stddev=np.sqrt(1 / 100)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             out = tf.layers.dense(out, 25, activation=tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(2 / 50)),
+                                      stddev=np.sqrt(1 / 50)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             out = tf.layers.dense(out, 1,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(2/25)),
+                                      stddev=np.sqrt(1 / 25)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             self.out = tf.squeeze(out)
             self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
@@ -82,8 +82,8 @@ class ValueFunction(object):
             self.replay_buffer_x = x
             self.replay_buffer_y = y
         else:
-            self.replay_buffer_x = np.concatenate([x, self.replay_buffer_x[:40000, :]])
-            self.replay_buffer_y = np.concatenate([y, self.replay_buffer_y[:40000]])
+            self.replay_buffer_x = np.concatenate([x, self.replay_buffer_x[:80000, :]])
+            self.replay_buffer_y = np.concatenate([y, self.replay_buffer_y[:80000]])
         y_hat = self.predict(x)
         old_exp_var = 1-np.var(y-y_hat)/np.var(y)
         batch_size = 256

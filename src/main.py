@@ -5,7 +5,7 @@ from value_function import *
 import scipy.signal
 
 
-def init_gym(env_name='Pendulum-v0'):
+def init_gym(env_name):
     """
 
     :param env_name: str, OpenAI Gym environment name
@@ -21,10 +21,32 @@ def init_gym(env_name='Pendulum-v0'):
     return env, obs_dim, act_dim
 
 
-def run_episode(env, policy, animate=False):
+class Scaler(object):
+    def __init__(self, obs_dim, alpha=0.1):
+        self.vars = np.zeros(obs_dim) + 1.0
+        self.means = np.zeros(obs_dim)
+        self.first_pass = True
+        self.alpha = alpha
+
+    def update_scale(self, x):
+
+        if self.first_pass:
+            self.vars = np.var(x, axis=0)
+            self.means = np.mean(x, axis=0)
+            self.first_pass = False
+        else:
+            self.vars += self.alpha * (np.var(x, axis=0) - self.vars)
+            self.means += self.alpha * (np.mean(x, axis=0) - self.means)
+
+    def get_scale(self):
+        return self.means, np.sqrt(self.vars)
+
+
+def run_episode(env, policy, obs_scaler, animate=False):
     """ Run single episode with option to animate
 
     Args:
+        obs_scaler:
         env: ai gym environment
         policy: policy with "sample" method
         animate: boolean, True uses env.render() method to animate episode
@@ -35,14 +57,19 @@ def run_episode(env, policy, animate=False):
         rewards: shape = (episode len,)
     """
     obs = env.reset()
-    observes, actions, rewards = [], [], []
+    observes, actions, rewards, unscaled_obs = [], [], [], []
     done = False
-    step = 0
+    step = 0.0
+    offset, scale = obs_scaler.get_scale()
+    scale[-1] = 1.0
+    offset[-1] = 0.0
     while not done:
         if animate:
             env.render()
-        obs = obs.astype(np.float64).reshape((1, -1))/3.0
-        obs = np.append(obs, [[step/2000]], axis=1)
+        obs = obs.astype(np.float64).reshape((1, -1))
+        obs = np.append(obs, [[step]], axis=1)
+        unscaled_obs.append(obs)
+        obs = (obs - offset) / (scale + 1e-4) / 3.0
         observes.append(obs)
         action = policy.sample(obs).reshape((1, -1)).astype(np.float64)
         actions.append(action)
@@ -50,12 +77,15 @@ def run_episode(env, policy, animate=False):
         if not isinstance(reward, float):
             reward = np.asscalar(reward)
         rewards.append(reward)
-        step += 1
+        step += 1e-3
 
-    return np.concatenate(observes), np.concatenate(actions), np.array(rewards, dtype=np.float64)
+    return (np.concatenate(observes), np.concatenate(actions),
+            np.array(rewards, dtype=np.float64), np.concatenate(unscaled_obs))
 
 
-def run_policy(env, policy, min_steps, min_episodes):
+
+
+def run_policy(env, policy, obs_scaler, min_steps, min_episodes):
     """ Run policy and collect data for a minimum of min_steps
 
     :param env: ai gym environment
@@ -66,17 +96,24 @@ def run_policy(env, policy, min_steps, min_episodes):
         'observes' : NumPy array of states from episode
         'actions' : NumPy array of actions from episode
         'rewards' : NumPy array of (undiscounted) rewards from episode
+
+    Args:
+        min_episodes:
+        obs_scaler:
     """
     steps, episodes = (0, 0)
     trajectories = []
     while not (steps >= min_steps and episodes >= min_episodes):
-        observes, actions, rewards = run_episode(env, policy)
+        observes, actions, rewards, unscaled_obs = run_episode(env, policy, obs_scaler)
         steps += observes.shape[0]
         episodes += 1
         trajectory = {'observes': observes,
                       'actions': actions,
-                      'rewards': rewards}
+                      'rewards': rewards,
+                      'unscaled_obs': unscaled_obs}
         trajectories.append(trajectory)
+    unscaled = np.concatenate([t['unscaled_obs'] for t in trajectories])
+    obs_scaler.update_scale(unscaled)
     log = {'MeanReward': np.mean([t['rewards'].sum() for t in trajectories]),
            'Steps': steps}
 
@@ -170,14 +207,16 @@ def disp_log(log):
 def main(num_iter=5000,
          gamma=0.995):
 
-    env, obs_dim, act_dim = init_gym('Hopper-v1')
+    env, obs_dim, act_dim = init_gym('InvertedDoublePendulum-v1')
     obs_dim += 1
-    env = wrappers.Monitor(env, '/tmp/hopper-experiment-1', force=True)
+    obs_scaler = Scaler(obs_dim)
+    env = wrappers.Monitor(env, '/tmp/swimmer-experiment-1', force=True)
     val_func = ValueFunction(obs_dim)
     lin_val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
+    log, trajectories = run_policy(env, policy, obs_scaler, min_steps=500, min_episodes=5)
     for i in range(num_iter):
-        log, trajectories = run_policy(env, policy, min_steps=2000, min_episodes=10)
+        log, trajectories = run_policy(env, policy, obs_scaler, min_steps=5000, min_episodes=20)
         log['Iteration'] = i
         add_value(trajectories, val_func, gamma)
         add_disc_sum_rew(trajectories, gamma)

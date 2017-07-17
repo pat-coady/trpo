@@ -3,7 +3,7 @@ import tensorflow as tf
 
 
 class Policy(object):
-    def __init__(self, obs_dim, act_dim, kl_targ=0.003):
+    def __init__(self, obs_dim, act_dim, kl_targ=0.006):
         self.beta = 1.0
         self.kl_targ = kl_targ
         self._build_graph(obs_dim, act_dim)
@@ -32,26 +32,26 @@ class Policy(object):
 
     def _policy_nn(self, obs_dim, act_dim):
         """ Neural net for policy approximation function """
-        out = tf.layers.dense(self.obs_ph, 100, tf.nn.tanh,
+        out = tf.layers.dense(self.obs_ph, 200, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
-                                  stddev=np.sqrt(2 / obs_dim)),
+                                  stddev=np.sqrt(1 / obs_dim)),
                               name="h1")
-        out = tf.layers.dense(out, 50, tf.nn.tanh,
+        out = tf.layers.dense(out, 100, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
-                                  stddev=np.sqrt(2 / 100)),
+                                  stddev=np.sqrt(1 / 200)),
                               name="h2")
-        out = tf.layers.dense(out, 25, tf.nn.tanh,
+        out = tf.layers.dense(out, 50, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
-                                  stddev=np.sqrt(2 / 50)),
+                                  stddev=np.sqrt(1 / 100)),
                               name="h3")
-        self.means = tf.layers.dense(out, act_dim,
-                                     kernel_initializer=tf.random_normal_initializer(
-                                         stddev=np.sqrt(2 / 25)),
-                                     name="means")
-        self.log_vars = tf.layers.dense(out, act_dim,
-                                        kernel_initializer=tf.random_normal_initializer(
-                                            stddev=np.sqrt(2 / 25)),
-                                        name="log_vars")
+        self.means = 1.5 * tf.layers.dense(out, act_dim, tf.tanh,
+                                           kernel_initializer=tf.random_normal_initializer(
+                                               stddev=np.sqrt(2 / 25)),
+                                           name="means")
+        self.log_vars = 2.0 * (tf.layers.dense(out, act_dim, tf.tanh,
+                                               kernel_initializer=tf.random_normal_initializer(
+                                                   stddev=np.sqrt(2 / 25)),
+                                               name="log_vars") - 1.0)
 
     def _logprob(self, act_dim):
         """ Log probabilities of batch of states, actions"""
@@ -95,7 +95,7 @@ class Policy(object):
                                     tf.exp(self.logp - self.logp_old))
         self.loss2 = tf.reduce_mean(self.beta_ph * self.kl)
         self.loss = self.loss1 + self.loss2
-        optimizer = tf.train.AdamOptimizer(0.0003)
+        optimizer = tf.train.AdamOptimizer(0.0001)
         self.train_op = optimizer.minimize(self.loss)
 
     def _init_session(self):
