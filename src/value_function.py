@@ -6,7 +6,7 @@ from sklearn.utils import shuffle
 class LinearValueFunction(object):
     coef = None
 
-    def fit(self, x, y):
+    def fit(self, x, y, logger):
         y_hat = self.predict(x)
         old_exp_var = 1-np.var(y-y_hat)/np.var(y)
         xp = self.preproc(x)
@@ -19,9 +19,9 @@ class LinearValueFunction(object):
         loss = np.mean(np.square(y_hat-y))
         exp_var = 1-np.var(y-y_hat)/np.var(y)
 
-        return {'LinValFuncLoss': loss,
-                'LinExplainedVarNew': exp_var,
-                'LinExplainedVarOld': old_exp_var}
+        logger.log({'LinValFuncLoss': loss,
+                    'LinExplainedVarNew': exp_var,
+                    'LinExplainedVarOld': old_exp_var})
 
     def predict(self, X):
         if self.coef is None:
@@ -77,13 +77,13 @@ class ValueFunction(object):
         self.sess = tf.Session(graph=self.g)
         self.sess.run(self.init)
 
-    def fit(self, x, y):
+    def fit(self, x, y, logger):
         if self.replay_buffer_x is None:
             self.replay_buffer_x = x
             self.replay_buffer_y = y
         else:
-            self.replay_buffer_x = np.concatenate([x, self.replay_buffer_x[:30000, :]])
-            self.replay_buffer_y = np.concatenate([y, self.replay_buffer_y[:30000]])
+            self.replay_buffer_x = np.concatenate([x, self.replay_buffer_x[:20000, :]])
+            self.replay_buffer_y = np.concatenate([y, self.replay_buffer_y[:20000]])
         y_hat = self.predict(x)
         old_exp_var = 1-np.var(y-y_hat)/np.var(y)
         batch_size = 256
@@ -99,9 +99,9 @@ class ValueFunction(object):
         loss = np.mean(np.square(y_hat-y))
         exp_var = 1-np.var(y-y_hat)/np.var(y)
 
-        return {'ValFuncLoss': loss,
-                'ExplainedVarNew': exp_var,
-                'ExplainedVarOld': old_exp_var}
+        logger.log({'ValFuncLoss': loss,
+                    'ExplainedVarNew': exp_var,
+                    'ExplainedVarOld': old_exp_var})
 
     def predict(self, x):
         feed_dict = {self.obs_ph: x}

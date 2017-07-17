@@ -27,6 +27,7 @@ class Policy(object):
         self.act_ph = tf.placeholder(tf.float32, (None, act_dim), 'act')
         self.advantages_ph = tf.placeholder(tf.float32, (None,), 'advantages')
         self.beta_ph = tf.placeholder(tf.float32, (), 'beta')
+        self.eta_ph = tf.placeholder(tf.float32, (), 'eta')
         self.old_log_vars_ph = tf.placeholder(tf.float32, (None, act_dim,), 'old_log_vars')
         self.old_means_ph = tf.placeholder(tf.float32, (None, act_dim), 'old_means')
 
@@ -76,7 +77,6 @@ class Policy(object):
         log_det_cov_new = tf.reduce_sum(self.log_vars, axis=1)
         tr_old_new = tf.reduce_sum(tf.exp(self.old_log_vars_ph - self.log_vars), axis=1)
 
-        # TODO: double-check kl implemented correctly
         self.kl = 0.5 * tf.reduce_mean(log_det_cov_new - log_det_cov_old + tr_old_new +
                                        tf.reduce_sum(tf.square(self.means - self.old_means_ph) /
                                                      tf.exp(self.log_vars), axis=1) - act_dim)
@@ -91,10 +91,11 @@ class Policy(object):
 
     def _loss_train_op(self):
         # TODO: use reduce_mean or reduce_sum?
-        self.loss1 = -tf.reduce_mean(self.advantages_ph *
+        loss1 = -tf.reduce_mean(self.advantages_ph *
                                      tf.exp(self.logp - self.logp_old))
-        self.loss2 = tf.reduce_mean(self.beta_ph * self.kl)
-        self.loss = self.loss1 + self.loss2
+        loss2 = tf.reduce_mean(self.beta_ph * self.kl)
+        loss3 = self.eta_ph * tf.square(tf.maximum(0.0, self.kl - 2.0 * self.kl_targ))
+        self.loss = loss1 + loss2 + loss3
         optimizer = tf.train.AdamOptimizer(0.00003)
         self.train_op = optimizer.minimize(self.loss)
 
@@ -109,17 +110,19 @@ class Policy(object):
 
         return self.sess.run(self.sampled_act, feed_dict=feed_dict)
 
-    def update(self, observes, actions, advantages, epochs=20):
+    def update(self, observes, actions, advantages, logger, epochs=20):
         feed_dict = {self.obs_ph: observes,
                      self.act_ph: actions,
                      self.advantages_ph: advantages,
-                     self.beta_ph: self.beta}
+                     self.beta_ph: self.beta,
+                     self.eta_ph: 300}
         old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
                                                       feed_dict)
         feed_dict[self.old_log_vars_ph] = old_log_vars_np
         feed_dict[self.old_means_ph] = old_means_np
         for e in range(epochs):
-            _, loss, kl = self.sess.run([self.train_op, self.loss, self.kl], feed_dict)
+            self.sess.run(self.train_op, feed_dict)
+            loss, kl, entropy = self.sess.run([self.loss, self.kl, self.entropy], feed_dict)
             if kl > self.kl_targ * 4:
                 break
         if kl > self.kl_targ * 2:
@@ -127,14 +130,11 @@ class Policy(object):
         elif kl < self.kl_targ / 2:
             self.beta /= 1.5
 
-        loss, entropy, kl = self.sess.run([self.loss, self.entropy, self.kl], feed_dict)
+        logger.log({'PolicyLoss': loss,
+                    'PolicyEntropy': entropy,
+                    'KL': kl,
+                    'Beta': self.beta})
 
-        metrics = {'PolicyLoss': loss,
-                   'PolicyEntropy': entropy,
-                   'KL': kl,
-                   'Beta': self.beta}
-
-        return metrics
 
     def close_sess(self):
         self.sess.close()

@@ -18,16 +18,15 @@ def init_gym(env_name):
     env = gym.make(env_name)
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
-    # obs_dim += 1  # extra dimension for time step
 
     return env, obs_dim, act_dim
 
 
-def run_episode(env, policy, obs_scaler, animate=False):
+def run_episode(env, policy, scaler, animate=False):
     """ Run single episode with option to animate
 
     Args:
-        obs_scaler:
+        scaler:
         env: ai gym environment
         policy: policy with "sample" method
         animate: boolean, True uses env.render() method to animate episode
@@ -41,14 +40,11 @@ def run_episode(env, policy, obs_scaler, animate=False):
     observes, actions, rewards, unscaled_obs = [], [], [], []
     done = False
     step = 0.0
-    offset, scale = obs_scaler.get_scale()
-    # scale[-1] = 1.0
-    # offset[-1] = 0.0
+    offset, scale = scaler.get_scale()
     while not done:
         if animate:
             env.render()
         obs = obs.astype(np.float64).reshape((1, -1))
-        # obs = np.append(obs, [[step]], axis=1)
         unscaled_obs.append(obs)
         obs = (obs - offset) / (scale + 1e-4) / 3.0
         observes.append(obs)
@@ -64,7 +60,7 @@ def run_episode(env, policy, obs_scaler, animate=False):
             np.array(rewards, dtype=np.float64), np.concatenate(unscaled_obs))
 
 
-def run_policy(env, policy, obs_scaler, min_steps, min_episodes):
+def run_policy(env, policy, scaler, logger, min_steps, min_episodes):
     """ Run policy and collect data for a minimum of min_steps
 
     :param env: ai gym environment
@@ -83,7 +79,7 @@ def run_policy(env, policy, obs_scaler, min_steps, min_episodes):
     steps, episodes = (0, 0)
     trajectories = []
     while not (steps >= min_steps and episodes >= min_episodes):
-        observes, actions, rewards, unscaled_obs = run_episode(env, policy, obs_scaler)
+        observes, actions, rewards, unscaled_obs = run_episode(env, policy, scaler)
         steps += observes.shape[0]
         episodes += 1
         trajectory = {'observes': observes,
@@ -92,11 +88,11 @@ def run_policy(env, policy, obs_scaler, min_steps, min_episodes):
                       'unscaled_obs': unscaled_obs}
         trajectories.append(trajectory)
     unscaled = np.concatenate([t['unscaled_obs'] for t in trajectories])
-    obs_scaler.update_scale(unscaled)
-    log = {'MeanReward': np.mean([t['rewards'].sum() for t in trajectories]),
-           'Steps': steps}
+    scaler.update_scale(unscaled)
+    logger.log({'_MeanReward': np.mean([t['rewards'].sum() for t in trajectories]),
+                'Steps': steps})
 
-    return log, trajectories
+    return trajectories
 
 
 def view_policy(env, policy):
@@ -171,54 +167,52 @@ def build_train_set(trajectories):
     return observes, actions, advantages, disc_sum_rew
 
 
-def log_batch_stats(observes, actions, advantages, disc_sum_rew):
-    log = {'_mean_obs': np.mean(observes),
-           '_min_obs': np.min(observes),
-           '_max_obs': np.max(observes),
-           '_std_obs': np.max(observes),
-           '_mean_act': np.mean(actions),
-           '_min_act': np.min(actions),
-           '_max_act': np.max(actions),
-           '_std_act': np.max(actions),
-           '_mean_adv': np.mean(advantages),
-           '_min_adv': np.min(advantages),
-           '_max_adv': np.max(advantages),
-           '_std_adv': np.max(advantages),
-           '_mean_discrew': np.mean(disc_sum_rew),
-           '_min_discrew': np.min(disc_sum_rew),
-           '_max_discrew': np.max(disc_sum_rew),
-           '_std_discrew': np.max(disc_sum_rew),
-           }
-
-    return log
+def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger):
+    logger.log({'_mean_obs': np.mean(observes),
+                '_min_obs': np.min(observes),
+                '_max_obs': np.max(observes),
+                '_std_obs': np.max(observes),
+                '_mean_act': np.mean(actions),
+                '_min_act': np.min(actions),
+                '_max_act': np.max(actions),
+                '_std_act': np.max(actions),
+                '_mean_adv': np.mean(advantages),
+                '_min_adv': np.min(advantages),
+                '_max_adv': np.max(advantages),
+                '_std_adv': np.max(advantages),
+                '_mean_discrew': np.mean(disc_sum_rew),
+                '_min_discrew': np.min(disc_sum_rew),
+                '_max_discrew': np.max(disc_sum_rew),
+                '_std_discrew': np.max(disc_sum_rew),
+                })
 
 
 def main(num_iter=5000,
          gamma=0.995):
 
-    log_path, env_name = 'log_files', 'Hopper-v1'
+    env_name = 'Hopper-v1'
     env, obs_dim, act_dim = init_gym(env_name)
-    obs_scaler = Scaler(obs_dim)
-    log = Logger(path=log_path, filename=env_name)
+    scaler = Scaler(obs_dim)
+    logger = Logger(logname=env_name)
     env = wrappers.Monitor(env, '/tmp/hopper-experiment-1', force=True)
-    val_func = ValueFunction(obs_dim)
-    lin_val_func = LinearValueFunction()
+    lin_val_func = ValueFunction(obs_dim)
+    val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
-    run_policy(env, policy, obs_scaler, min_steps=500, min_episodes=5)
+    run_policy(env, policy, scaler, logger, min_steps=500, min_episodes=5)
     for i in range(num_iter):
-        trajectories = run_policy(env, policy, obs_scaler, min_steps=5000, min_episodes=20)
-        log['Iteration'] = i
+        logger.log({'_Iteration': i})
+        trajectories = run_policy(env, policy, scaler, logger, min_steps=5000, min_episodes=20)
         add_value(trajectories, val_func, gamma)
         add_disc_sum_rew(trajectories, gamma)
         add_advantage(trajectories)
         observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
-        log.update(log_batch_stats(observes, actions, advantages, disc_sum_rew))
-        log.update(policy.update(observes, actions, advantages))
-        log.update(val_func.fit(observes, disc_sum_rew))
-        log.update(lin_val_func.fit(observes, disc_sum_rew))
-        disp_log(log)
+        log_batch_stats(observes, actions, advantages, disc_sum_rew, logger)
+        policy.update(observes, actions, advantages, logger)
+        val_func.fit(observes, disc_sum_rew, logger)
+        lin_val_func.fit(observes, disc_sum_rew, logger)
+        logger.write(display=True)
+    logger.close()
 
 
 if __name__ == "__main__":
     main()
-

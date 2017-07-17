@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import csv
+from datetime import datetime
 
 
 class Scaler(object):
@@ -25,31 +26,32 @@ class Scaler(object):
 
 
 class Logger(object):
-    def __init__(self, path, filename):
-        path_filename = os.path.exists(os.path.join(path, filename+'.csv'))
+    def __init__(self, logname):
+        now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")
+        path = os.path.join('log-files', logname, now)
+        os.makedirs(path)
+        path = os.path.join(path, 'log.csv')
+
         self.write_header = True
         self.row = {}
-        assert not os.path.exists(path_filename), 'Logfile {} already exists'.format(filename)
-        if not os.path.isdir(path):
-            os.makedirs(path)
-        self.f = open(path_filename, 'w')
+        self.f = open(path, 'w')
         self.writer = None  # DictWriter created with first call to write() method
 
-    def write(self, log, display=True):
+    def write(self, display=True):
         if display:
-            self.disp_log(log)
+            self.disp(self.row)
         if self.write_header:
-            fieldnames = [x for x in log.keys()]
+            fieldnames = [x for x in self.row.keys()]
             self.writer = csv.DictWriter(self.f, fieldnames=fieldnames)
             self.writer.writeheader()
-            self.writer.writerow(log)
+            self.writer.writerow(self.row)
             self.write_header = False
         else:
-            self.writer.writerow(log)
+            self.writer.writerow(self.row)
         self.row = {}
 
     @staticmethod
-    def disp_log(log):
+    def disp(log):
         """Print metrics to stdout"""
         log_keys = [k for k in log.keys()]
         log_keys.sort()
@@ -60,7 +62,7 @@ class Logger(object):
                 print('{:s}: {:.3g}'.format(key, log[key]))
         print('\n')
 
-    def log_items(self, items):
+    def log(self, items):
         self.row.update(items)
 
     def close(self):
