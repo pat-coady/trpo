@@ -3,7 +3,7 @@ import tensorflow as tf
 
 
 class Policy(object):
-    def __init__(self, obs_dim, act_dim, kl_targ=0.006):
+    def __init__(self, obs_dim, act_dim, kl_targ=0.003):
         self.beta = 1.0
         self.kl_targ = kl_targ
         self._build_graph(obs_dim, act_dim)
@@ -46,12 +46,12 @@ class Policy(object):
                               name="h3")
         self.means = 1.5 * tf.layers.dense(out, act_dim, tf.tanh,
                                            kernel_initializer=tf.random_normal_initializer(
-                                               stddev=np.sqrt(2 / 25)),
+                                               stddev=np.sqrt(1 / 50)),
                                            name="means")
         self.log_vars = 2.0 * (tf.layers.dense(out, act_dim, tf.tanh,
                                                kernel_initializer=tf.random_normal_initializer(
-                                                   stddev=np.sqrt(2 / 25)),
-                                               name="log_vars") - 1.0)
+                                                   stddev=np.sqrt(1 / 50)),
+                                               name="log_vars") - 1.5)
 
     def _logprob(self, act_dim):
         """ Log probabilities of batch of states, actions"""
@@ -92,10 +92,10 @@ class Policy(object):
     def _loss_train_op(self):
         # TODO: use reduce_mean or reduce_sum?
         self.loss1 = -tf.reduce_mean(self.advantages_ph *
-                                    tf.exp(self.logp - self.logp_old))
+                                     tf.exp(self.logp - self.logp_old))
         self.loss2 = tf.reduce_mean(self.beta_ph * self.kl)
         self.loss = self.loss1 + self.loss2
-        optimizer = tf.train.AdamOptimizer(0.0001)
+        optimizer = tf.train.AdamOptimizer(0.00003)
         self.train_op = optimizer.minimize(self.loss)
 
     def _init_session(self):
