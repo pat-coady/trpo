@@ -18,6 +18,7 @@ def init_gym(env_name):
     env = gym.make(env_name)
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
+    obs_dim += 1
 
     return env, obs_dim, act_dim
 
@@ -44,9 +45,10 @@ def run_episode(env, policy, scaler, animate=False):
     while not done:
         if animate:
             env.render()
-        obs = obs.astype(np.float64).reshape((1, -1))
+        obs = obs.astype(np.float64).reshape((1, -1))/3
+        obs = np.append(obs, [[step]], axis=1)
         unscaled_obs.append(obs)
-        obs = (obs - offset) / (scale + 1e-4) / 3.0
+        # obs = (obs - offset) / (scale + 1e-4) / 3.0
         observes.append(obs)
         action = policy.sample(obs).reshape((1, -1)).astype(np.float64)
         actions.append(action)

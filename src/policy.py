@@ -45,14 +45,16 @@ class Policy(object):
                               kernel_initializer=tf.random_normal_initializer(
                                   stddev=np.sqrt(1 / 100)),
                               name="h3")
-        self.means = 1.5 * tf.layers.dense(out, act_dim, tf.tanh,
-                                           kernel_initializer=tf.random_normal_initializer(
-                                               stddev=np.sqrt(1 / 50)),
-                                           name="means")
-        self.log_vars = 2.0 * (tf.layers.dense(out, act_dim, tf.tanh,
-                                               kernel_initializer=tf.random_normal_initializer(
-                                                   stddev=np.sqrt(1 / 50)),
-                                               name="log_vars") - 1.5)
+        self.means = tf.layers.dense(out, act_dim,
+                                     kernel_initializer=tf.random_normal_initializer(
+                                         stddev=np.sqrt(1 / 50)),
+                                     name="means")
+        # self.log_vars = tf.layers.dense(out, act_dim,
+        #                                 kernel_initializer=tf.random_normal_initializer(
+        #                                     stddev=np.sqrt(1 / 50)),
+        #                                 name="log_vars")
+        self.log_vars = tf.get_variable()
+
 
     def _logprob(self, act_dim):
         """ Log probabilities of batch of states, actions"""
@@ -115,7 +117,7 @@ class Policy(object):
                      self.act_ph: actions,
                      self.advantages_ph: advantages,
                      self.beta_ph: self.beta,
-                     self.eta_ph: 300}
+                     self.eta_ph: 100}
         old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
                                                       feed_dict)
         feed_dict[self.old_log_vars_ph] = old_log_vars_np
