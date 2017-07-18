@@ -28,7 +28,7 @@ class Policy(object):
         self.advantages_ph = tf.placeholder(tf.float32, (None,), 'advantages')
         self.beta_ph = tf.placeholder(tf.float32, (), 'beta')
         self.eta_ph = tf.placeholder(tf.float32, (), 'eta')
-        self.old_log_vars_ph = tf.placeholder(tf.float32, (act_dim,), 'old_log_vars')
+        self.old_log_vars_ph = tf.placeholder(tf.float32, (None, act_dim,), 'old_log_vars')
         self.old_means_ph = tf.placeholder(tf.float32, (None, act_dim), 'old_means')
 
     def _policy_nn(self, obs_dim, act_dim):
@@ -49,8 +49,10 @@ class Policy(object):
                                      kernel_initializer=tf.random_normal_initializer(
                                          stddev=np.sqrt(1 / 50)),
                                      name="means")
-        log_vars = tf.get_variable('logvars', (3, act_dim), tf.float32, tf.constant_initializer(0.0))
-        self.log_vars = tf.reduce_sum(log_vars, axis=0) - 1.0
+        self.log_vars = tf.layers.dense(out, act_dim,
+                                        kernel_initializer=tf.random_normal_initializer(
+                                            stddev=np.sqrt(1 / 50)),
+                                        name="log_vars")
 
     def _logprob(self, act_dim):
         """ Log probabilities of batch of states, actions"""
@@ -62,7 +64,7 @@ class Policy(object):
         self.logp = logp
 
         logp_old = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)
-        logp_old += -0.5 * tf.reduce_sum(self.old_log_vars_ph)
+        logp_old += -0.5 * tf.reduce_sum(self.old_log_vars_ph, axis=1)
         logp_old += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.old_means_ph) /
                                          tf.exp(self.old_log_vars_ph), axis=1)
         self.logp_old = logp_old
@@ -72,15 +74,16 @@ class Policy(object):
         Add KL divergence between old and new distributions
         Add entropy of present policy given states and actions
         """
-        log_det_cov_old = tf.reduce_sum(self.old_log_vars_ph)
-        log_det_cov_new = tf.reduce_sum(self.log_vars)
-        tr_old_new = tf.reduce_sum(tf.exp(self.old_log_vars_ph - self.log_vars))
+        log_det_cov_old = tf.reduce_sum(self.old_log_vars_ph, axis=1)
+        log_det_cov_new = tf.reduce_sum(self.log_vars, axis=1)
+        tr_old_new = tf.reduce_sum(tf.exp(self.old_log_vars_ph - self.log_vars), axis=1)
 
         self.kl = 0.5 * tf.reduce_mean(log_det_cov_new - log_det_cov_old + tr_old_new +
                                        tf.reduce_sum(tf.square(self.means - self.old_means_ph) /
                                                      tf.exp(self.log_vars), axis=1) - act_dim)
+
         self.entropy = 0.5 * (act_dim * (np.log(2 * np.pi) + 1) +
-                              tf.reduce_sum(self.log_vars))
+                              tf.reduce_mean(tf.reduce_sum(self.log_vars, axis=1)))
 
     def _sample(self, act_dim):
         """ Sample from distribution, given observation"""
