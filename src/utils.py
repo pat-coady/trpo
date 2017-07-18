@@ -1,5 +1,7 @@
 import numpy as np
 import os
+import shutil
+import glob
 import csv
 from datetime import datetime
 
@@ -30,6 +32,9 @@ class Logger(object):
         now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")
         path = os.path.join('log-files', logname, now)
         os.makedirs(path)
+        filenames = glob.glob('*.py')  # put copy of all python files in log_dir
+        for filename in filenames:     # for reference
+            shutil.copy(filename, path)
         path = os.path.join(path, 'log.csv')
 
         self.write_header = True

@@ -173,19 +173,19 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger):
     logger.log({'_mean_obs': np.mean(observes),
                 '_min_obs': np.min(observes),
                 '_max_obs': np.max(observes),
-                '_std_obs': np.max(observes),
+                '_std_obs': np.mean(np.var(observes, axis=0)),
                 '_mean_act': np.mean(actions),
                 '_min_act': np.min(actions),
                 '_max_act': np.max(actions),
-                '_std_act': np.max(actions),
+                '_std_act': np.mean(np.var(actions, axis=0)),
                 '_mean_adv': np.mean(advantages),
                 '_min_adv': np.min(advantages),
                 '_max_adv': np.max(advantages),
-                '_std_adv': np.max(advantages),
+                '_std_adv': np.var(advantages),
                 '_mean_discrew': np.mean(disc_sum_rew),
                 '_min_discrew': np.min(disc_sum_rew),
                 '_max_discrew': np.max(disc_sum_rew),
-                '_std_discrew': np.max(disc_sum_rew),
+                '_std_discrew': np.var(disc_sum_rew),
                 })
 
 
@@ -196,9 +196,9 @@ def main(num_iter=5000,
     env, obs_dim, act_dim = init_gym(env_name)
     scaler = Scaler(obs_dim)
     logger = Logger(logname=env_name)
-    env = wrappers.Monitor(env, '/tmp/hopper-experiment-1', force=True)
-    lin_val_func = ValueFunction(obs_dim)
-    val_func = LinearValueFunction()
+    env = wrappers.Monitor(env, '/tmp/hopper-experiment-2', force=True)
+    lin_val_func = LinearValueFunction()
+    val_func = ValueFunction(obs_dim)
     policy = Policy(obs_dim, act_dim)
     run_policy(env, policy, scaler, logger, min_steps=500, min_episodes=5)
     for i in range(num_iter):
