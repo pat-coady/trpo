@@ -4,6 +4,8 @@ from policy import *
 from value_function import *
 import scipy.signal
 from utils import Logger, Scaler
+from datetime import datetime
+import os
 
 
 def init_gym(env_name):
@@ -107,7 +109,7 @@ def view_policy(env, policy):
     return run_episode(env, policy, animate=True)
 
 
-def add_disc_sum_rew(trajectories, gamma=1.0):
+def add_disc_sum_rew(trajectories, gamma=0.99):
     """ Adds discounted sum of rewards to all timesteps of all trajectories
 
     :param trajectories: as returned by run_policy()
@@ -194,9 +196,11 @@ def main(num_iter=5000,
 
     env_name = 'Hopper-v1'
     env, obs_dim, act_dim = init_gym(env_name)
+    now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")
+    aigym_path = os.path.join('/tmp', env_name, now)
+    env = wrappers.Monitor(env, aigym_path, force=True)
     scaler = Scaler(obs_dim)
     logger = Logger(logname=env_name)
-    env = wrappers.Monitor(env, '/tmp/hopper-experiment-2', force=True)
     lin_val_func = LinearValueFunction()
     val_func = ValueFunction(obs_dim)
     policy = Policy(obs_dim, act_dim)

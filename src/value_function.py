@@ -29,7 +29,8 @@ class LinearValueFunction(object):
         else:
             return self.preproc(X).dot(self.coef)
 
-    def preproc(self, X):
+    @staticmethod
+    def preproc(X):
 
         return np.concatenate([np.ones([X.shape[0], 1]), X, np.square(X)/2.0], axis=1)
 

@@ -54,14 +54,13 @@ class Policy(object):
 
     def _logprob(self, act_dim):
         """ Log probabilities of batch of states, actions"""
-        logp = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)
-        # logp += -0.5 * tf.reduce_sum(self.log_vars, axis=1)
+        logp = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)  # constant, can be removed
         logp += -0.5 * tf.reduce_sum(self.log_vars)
         logp += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.means) /
                                      tf.exp(self.log_vars), axis=1)
         self.logp = logp
 
-        logp_old = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)
+        logp_old = -0.5 * (np.log(np.sqrt(2.0 * np.pi)) * act_dim)  # constant, can be removed
         logp_old += -0.5 * tf.reduce_sum(self.old_log_vars_ph)
         logp_old += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.old_means_ph) /
                                          tf.exp(self.old_log_vars_ph), axis=1)
