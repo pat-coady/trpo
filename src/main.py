@@ -1,7 +1,7 @@
 import gym
 from gym import wrappers
-from policy import *
-from value_function import *
+from policy_autosize import *
+from value_function_autosize import *
 import scipy.signal
 from utils import Logger, Scaler
 from datetime import datetime
@@ -219,7 +219,7 @@ def main(num_iter=5000,
          gamma=0.995,
          lam=0.98):
 
-    env_name = 'Hopper-v1'
+    env_name = 'HalfCheetah-v1'
     env, obs_dim, act_dim = init_gym(env_name)
     now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")
     aigym_path = os.path.join('/tmp', env_name, now)

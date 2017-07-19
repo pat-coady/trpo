@@ -37,13 +37,13 @@ class LinearValueFunction(object):
 
 class ValueFunction(object):
 
-    def __init__(self, obs_dim, epochs=5, reg=5e-5, lr=1e-3):
+    def __init__(self, obs_dim, epochs=5, reg=5e-5):
         self.replay_buffer_x = None
         self.replay_buffer_y = None
         self.obs_dim = obs_dim
         self.epochs = epochs
         self.reg = reg
-        self.lr = lr
+        self.lr = None
         self._build_graph()
         self.sess = tf.Session(graph=self.g)
         self.sess.run(self.init)
@@ -53,38 +53,44 @@ class ValueFunction(object):
         with self.g.as_default():
             self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
             self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
-            out = tf.layers.dense(self.obs_ph, 200, activation=tf.tanh,
+            hid1_size = self.obs_dim * 5
+            hid3_size = 5
+            hid2_size = int(np.sqrt(hid1_size * hid3_size))
+            num_params = self.obs_dim * hid1_size + hid1_size * hid2_size + hid2_size * hid3_size
+            self.lr = 1.0 / num_params / 3.0
+            out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(1 / self.obs_dim)),
-                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
-            out = tf.layers.dense(out, 50, activation=tf.tanh,
+                                  name="h1")
+            out = tf.layers.dense(out, hid2_size, tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / 100)),
-                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
-            # out = tf.layers.dense(out, 25, activation=tf.tanh,
-            #                       kernel_initializer=tf.random_normal_initializer(
-            #                           stddev=np.sqrt(1 / 50)),
-            #                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
+                                      stddev=np.sqrt(1 / hid1_size)),
+                                  name="h2")
+            out = tf.layers.dense(out, hid3_size, tf.tanh,
+                                  kernel_initializer=tf.random_normal_initializer(
+                                      stddev=np.sqrt(1 / hid2_size)),
+                                  name="h3")
             out = tf.layers.dense(out, 1,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / 25)),
+                                      stddev=np.sqrt(1 / hid3_size)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             self.out = tf.squeeze(out)
             self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
             self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
-            optimizer = tf.train.MomentumOptimizer(self.lr, momentum=0.9, use_nesterov=True)
+            # optimizer = tf.train.MomentumOptimizer(self.lr, momentum=0.9, use_nesterov=True)
+            optimizer = tf.train.AdamOptimizer(self.lr)
             self.train_op = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
         self.sess = tf.Session(graph=self.g)
         self.sess.run(self.init)
 
     def fit(self, x, y, logger):
-        # if self.replay_buffer_x is None:
-        self.replay_buffer_x = x
-        self.replay_buffer_y = y
-        # else:
-        #     self.replay_buffer_x = np.concatenate([x, self.replay_buffer_x[:20000, :]])
-        #     self.replay_buffer_y = np.concatenate([y, self.replay_buffer_y[:20000]])
+        if self.replay_buffer_x is None:
+            self.replay_buffer_x = x
+            self.replay_buffer_y = y
+        else:
+            self.replay_buffer_x = np.concatenate([x, self.replay_buffer_x[:20000, :]])
+            self.replay_buffer_y = np.concatenate([y, self.replay_buffer_y[:20000]])
         y_hat = self.predict(x)
         old_exp_var = 1-np.var(y-y_hat)/np.var(y)
         batch_size = 256
