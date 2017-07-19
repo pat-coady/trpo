@@ -93,8 +93,8 @@ class Policy(object):
         loss2 = tf.reduce_mean(self.beta_ph * self.kl)
         loss3 = self.eta_ph * tf.square(tf.maximum(0.0, self.kl - 2.0 * self.kl_targ))
         self.loss = loss1 + loss2 + loss3
-        # optimizer = tf.train.AdamOptimizer(0.00003)
-        optimizer = tf.train.MomentumOptimizer(learning_rate=0.001, momentum=0.9, use_nesterov=True)
+        optimizer = tf.train.AdamOptimizer(0.00003)
+        # optimizer = tf.train.MomentumOptimizer(learning_rate=0.001, momentum=0.9, use_nesterov=True)
         self.train_op = optimizer.minimize(self.loss)
 
     def _init_session(self):

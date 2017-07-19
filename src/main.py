@@ -43,14 +43,17 @@ def run_episode(env, policy, scaler, animate=False):
     observes, actions, rewards, unscaled_obs = [], [], [], []
     done = False
     step = 0.0
-    offset, scale = scaler.get_scale()
+    # offset, scale = scaler.get_scale()
+    # offset[-1] = 0
+    # scale = np.maximum(scale, np.ones(scale.shape))
+    # scale[-1] = 1.0
     while not done:
         if animate:
             env.render()
         obs = obs.astype(np.float64).reshape((1, -1))/3
         obs = np.append(obs, [[step]], axis=1)
         unscaled_obs.append(obs)
-        # obs = (obs - offset) / (scale + 1e-4) / 3.0
+        # obs = (obs - offset) / scale / 3.0
         observes.append(obs)
         action = policy.sample(obs).reshape((1, -1)).astype(np.float64)
         actions.append(action)
@@ -109,14 +112,16 @@ def view_policy(env, policy):
     return run_episode(env, policy, animate=True)
 
 
-def add_disc_sum_rew(trajectories, gamma=0.99):
+def add_disc_sum_rew(trajectories, gamma):
     """ Adds discounted sum of rewards to all timesteps of all trajectories
 
-    :param trajectories: as returned by run_policy()
-    :return: None (mutates trajectories to add 'disc_sum_rew' key)
-
     Args:
-        gamma:
+        trajectories: as returned by run_policy()
+        gamma: discount
+
+    Returns:
+        None (mutates trajectories dictionary to add 'disc_sum_rew')
+
     """
     for trajectory in trajectories:
         rewards = trajectory['rewards'] * (1 - gamma)
@@ -124,7 +129,26 @@ def add_disc_sum_rew(trajectories, gamma=0.99):
         trajectory['disc_sum_rew'] = disc_sum_rew
 
 
-def add_value(trajectories, val_func, gamma):
+def add_gae(trajectories, gamma, lam):
+    """
+
+    Args:
+        trajectories:
+        gamma:
+
+    Returns:
+
+    """
+    for trajectory in trajectories:
+        rewards = trajectory['rewards'] * (1 - gamma)
+        values = trajectory['values']
+        # temporal differences
+        tds = rewards - values + np.append(values[1:] * gamma, 0)
+        advantages = scipy.signal.lfilter([1.0], [1.0, -gamma * lam], tds[::-1])[::-1]
+        trajectory['advantages'] = advantages
+
+
+def add_value(trajectories, val_func):
     """ Adds estimated value to all timesteps of all trajectories
 
     :param trajectories: as returned by run_policy()
@@ -192,7 +216,8 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger):
 
 
 def main(num_iter=5000,
-         gamma=0.995):
+         gamma=0.995,
+         lam=0.98):
 
     env_name = 'Hopper-v1'
     env, obs_dim, act_dim = init_gym(env_name)
@@ -208,9 +233,10 @@ def main(num_iter=5000,
     for i in range(num_iter):
         logger.log({'_Iteration': i})
         trajectories = run_policy(env, policy, scaler, logger, min_steps=5000, min_episodes=20)
-        add_value(trajectories, val_func, gamma)
+        add_value(trajectories, val_func)
         add_disc_sum_rew(trajectories, gamma)
-        add_advantage(trajectories)
+        # add_advantage(trajectories)
+        add_gae(trajectories, gamma, lam)
         observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
         log_batch_stats(observes, actions, advantages, disc_sum_rew, logger)
         policy.update(observes, actions, advantages, logger)

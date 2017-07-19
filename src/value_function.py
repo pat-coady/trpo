@@ -37,7 +37,7 @@ class LinearValueFunction(object):
 
 class ValueFunction(object):
 
-    def __init__(self, obs_dim, epochs=5, reg=5e-5, lr=1e-3):
+    def __init__(self, obs_dim, epochs=10, reg=5e-5, lr=1e-3):
         self.replay_buffer_x = None
         self.replay_buffer_y = None
         self.obs_dim = obs_dim
@@ -61,10 +61,10 @@ class ValueFunction(object):
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(1 / 100)),
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
-            # out = tf.layers.dense(out, 25, activation=tf.tanh,
-            #                       kernel_initializer=tf.random_normal_initializer(
-            #                           stddev=np.sqrt(1 / 50)),
-            #                       kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
+            out = tf.layers.dense(out, 25, activation=tf.tanh,
+                                  kernel_initializer=tf.random_normal_initializer(
+                                      stddev=np.sqrt(1 / 50)),
+                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             out = tf.layers.dense(out, 1,
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(1 / 25)),
@@ -72,24 +72,31 @@ class ValueFunction(object):
             self.out = tf.squeeze(out)
             self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
             self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
-            optimizer = tf.train.MomentumOptimizer(self.lr, momentum=0.9, use_nesterov=True)
+            optimizer = tf.train.AdamOptimizer(0.00003)
+            # optimizer = tf.train.MomentumOptimizer(self.lr, momentum=0.9, use_nesterov=True)
             self.train_op = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
         self.sess = tf.Session(graph=self.g)
         self.sess.run(self.init)
 
     def fit(self, x, y, logger):
-        if self.replay_buffer_x is None:
-            self.replay_buffer_x = x
-            self.replay_buffer_y = y
-        else:
-            self.replay_buffer_x = np.concatenate([x, self.replay_buffer_x[:20000, :]])
-            self.replay_buffer_y = np.concatenate([y, self.replay_buffer_y[:20000]])
         y_hat = self.predict(x)
         old_exp_var = 1-np.var(y-y_hat)/np.var(y)
+        # if self.replay_buffer_x is None:
+        #     self.replay_buffer_x = x.copy()
+        #     self.replay_buffer_y = y.copy()
+        #     x_train = x.copy()
+        #     y_train = y.copy()
+        # else:
+        #     x_train = np.concatenate([x, self.replay_buffer_x])
+        #     y_train = np.concatenate([y, self.replay_buffer_y])
+        #     self.replay_buffer_x = x.copy()
+        #     self.replay_buffer_y = y.copy()
+        x_train = x.copy()
+        y_train = y.copy()
         batch_size = 256
         for e in range(self.epochs):
-            x_train, y_train = shuffle(self.replay_buffer_x, self.replay_buffer_y)
+            x_train, y_train = shuffle(x_train, y_train)
             for j in range(x.shape[0] // batch_size):
                 start = j*batch_size
                 end = (j+1)*batch_size
