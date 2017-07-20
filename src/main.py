@@ -1,6 +1,6 @@
 """
 PPO: Proximal Policy Optimization
-Written by Patrick Coady (pcoady@alum.mit.edu)
+Written by Patrick Coady (pat-coady.github.io)
 
 PPO uses a loss function and gradient descent to approximate
 Trust Region Policy Optimization (TRPO). See these papers for
@@ -269,7 +269,7 @@ def main(num_iter=5000,
     env = wrappers.Monitor(env, aigym_path, force=True)
     scaler = ConstantScaler(obs_dim, 1.0/3, 0.0)
     lin_val_func = LinearValueFunction()
-    val_func = ValueFunction(obs_dim)
+    val_func = NNValueFunction(obs_dim)
     policy = Policy(obs_dim, act_dim)
     # a few runs of untrained policy to initialize scaler:
     run_policy(env, policy, scaler, logger, min_steps=500, min_episodes=5)

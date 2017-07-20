@@ -1,12 +1,29 @@
+"""
+State-Value Functions
+Written by Patrick Coady (pat-coady.github.io)
+"""
+
 import tensorflow as tf
 import numpy as np
 from sklearn.utils import shuffle
 
 
 class LinearValueFunction(object):
-    coef = None
+    """Simple linear regression value function, uses linear and squared features.
+
+    Mostly copied from: https://github.com/joschu/modular_rl
+    """
+    def __init__(self):
+        self.coef = None
 
     def fit(self, x, y, logger):
+        """ Fit model
+
+        Args:
+            x: features
+            y: target
+            logger: logger to save training loss and % explained variance
+        """
         y_hat = self.predict(x)
         old_exp_var = 1-np.var(y-y_hat)/np.var(y)
         xp = self.preproc(x)
@@ -23,32 +40,40 @@ class LinearValueFunction(object):
                     'LinExplainedVarNew': exp_var,
                     'LinExplainedVarOld': old_exp_var})
 
-    def predict(self, X):
+    def predict(self, x):
+        """ Predict method, predict zeros if model untrained """
         if self.coef is None:
-            return np.zeros(X.shape[0])
+            return np.zeros(x.shape[0])
         else:
-            return self.preproc(X).dot(self.coef)
+            return self.preproc(x).dot(self.coef)
 
     @staticmethod
     def preproc(X):
+        """ Generate squared features and bias term """
 
         return np.concatenate([np.ones([X.shape[0], 1]), X, np.square(X)/2.0], axis=1)
 
 
-class ValueFunction(object):
-
-    def __init__(self, obs_dim, epochs=5, reg=5e-5):
+class NNValueFunction(object):
+    """ NN-based state-value function """
+    def __init__(self, obs_dim):
+        """
+        Args:
+            obs_dim: number of dimensions in observation vector (int)
+        """
         self.replay_buffer_x = None
         self.replay_buffer_y = None
         self.obs_dim = obs_dim
-        self.epochs = epochs
-        self.reg = reg
-        self.lr = None
+        self.batch_size = 256
+        self.epochs = 10
+        self.reg = 5e-5  # regularization
+        self.lr = None  # learning rate, set in _build_graph()
         self._build_graph()
         self.sess = tf.Session(graph=self.g)
         self.sess.run(self.init)
 
     def _build_graph(self):
+        """ Construct TensorFlow graph, including loss function, init op and train op """
         self.g = tf.Graph()
         with self.g.as_default():
             self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
@@ -88,20 +113,27 @@ class ValueFunction(object):
         self.sess.run(self.init)
 
     def fit(self, x, y, logger):
-        if self.replay_buffer_x is None:
-            self.replay_buffer_x = x
-            self.replay_buffer_y = y
-        else:
-            self.replay_buffer_x = np.concatenate([x, self.replay_buffer_x[:20000, :]])
-            self.replay_buffer_y = np.concatenate([y, self.replay_buffer_y[:20000]])
+        """ Fit model to current data batch + previous data batch
+
+        Args:
+            x: features
+            y: target
+            logger: logger to save training loss and % explained variance
+        """
         y_hat = self.predict(x)
         old_exp_var = 1-np.var(y-y_hat)/np.var(y)
-        batch_size = 256
+        if self.replay_buffer_x is None:
+            x_train, y_train = x, y
+        else:
+            x_train = np.concatenate([x, self.replay_buffer_x])
+            y_train = np.concatenate([y, self.replay_buffer_y])
+        self.replay_buffer_x = x
+        self.replay_buffer_y = y
         for e in range(self.epochs):
-            x_train, y_train = shuffle(self.replay_buffer_x, self.replay_buffer_y)
-            for j in range(x.shape[0] // batch_size):
-                start = j*batch_size
-                end = (j+1)*batch_size
+            x_train, y_train = shuffle(x_train, y_train)
+            for j in range(x.shape[0] // self.batch_size):
+                start = j * self.batch_size
+                end = (j + 1) * self.batch_size
                 feed_dict = {self.obs_ph: x_train[start:end, :],
                              self.val_ph: y_train[start:end]}
                 _, l = self.sess.run([self.train_op, self.loss], feed_dict=feed_dict)
@@ -114,10 +146,12 @@ class ValueFunction(object):
                     'ExplainedVarOld': old_exp_var})
 
     def predict(self, x):
+        """ Predict method """
         feed_dict = {self.obs_ph: x}
         y_hat = self.sess.run(self.out, feed_dict=feed_dict)
 
         return np.squeeze(y_hat)
 
     def close_sess(self):
+        """ Close TensorFlow session """
         self.sess.close()
