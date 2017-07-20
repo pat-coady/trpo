@@ -1,5 +1,6 @@
 """
 PPO: Proximal Policy Optimization
+
 Written by Patrick Coady (pat-coady.github.io)
 
 PPO uses a loss function and gradient descent to approximate

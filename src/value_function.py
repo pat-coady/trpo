@@ -1,5 +1,6 @@
 """
 State-Value Functions
+
 Written by Patrick Coady (pat-coady.github.io)
 """
 
@@ -17,7 +18,7 @@ class LinearValueFunction(object):
         self.coef = None
 
     def fit(self, x, y, logger):
-        """ Fit model
+        """ Fit model - (i.e. solve normal equations)
 
         Args:
             x: features
@@ -121,7 +122,7 @@ class NNValueFunction(object):
             logger: logger to save training loss and % explained variance
         """
         y_hat = self.predict(x)
-        old_exp_var = 1-np.var(y-y_hat)/np.var(y)
+        old_exp_var = 1 - np.var(y - y_hat)/np.var(y)
         if self.replay_buffer_x is None:
             x_train, y_train = x, y
         else:
@@ -138,8 +139,8 @@ class NNValueFunction(object):
                              self.val_ph: y_train[start:end]}
                 _, l = self.sess.run([self.train_op, self.loss], feed_dict=feed_dict)
         y_hat = self.predict(x)
-        loss = np.mean(np.square(y_hat-y))
-        exp_var = 1-np.var(y-y_hat)/np.var(y)
+        loss = np.mean(np.square(y_hat - y))
+        exp_var = 1 - np.var(y - y_hat) / np.var(y)
 
         logger.log({'ValFuncLoss': loss,
                     'ExplainedVarNew': exp_var,
