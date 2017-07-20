@@ -268,7 +268,7 @@ def main(num_iter=5000,
     logger = Logger(logname=env_name, now=now)
     aigym_path = os.path.join('/tmp', env_name, now)
     env = wrappers.Monitor(env, aigym_path, force=True)
-    scaler = ConstantScaler(obs_dim, 1.0/3, 0.0)
+    scaler = ConstantScaler(obs_dim, 1.0 / 3, 0.0)
     lin_val_func = LinearValueFunction()
     val_func = NNValueFunction(obs_dim)
     policy = Policy(obs_dim, act_dim)

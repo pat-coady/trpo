@@ -84,7 +84,7 @@ class NNValueFunction(object):
             # hid2_size = int(np.sqrt(hid1_size * hid3_size))
             hid1_size = 200
             hid2_size = 50
-            hid3_size = 50
+            hid3_size = 25
             num_params = self.obs_dim * hid1_size + hid1_size * hid2_size + hid2_size * hid3_size
             # self.lr = 1.0 / num_params / 3.0
             self.lr = 1e-3
@@ -96,10 +96,10 @@ class NNValueFunction(object):
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(1 / hid1_size)),
                                   name="h2")
-            # out = tf.layers.dense(out, hid3_size, tf.tanh,
-            #                       kernel_initializer=tf.random_normal_initializer(
-            #                           stddev=np.sqrt(1 / hid2_size)),
-            #                       name="h3")
+            out = tf.layers.dense(out, hid3_size, tf.tanh,
+                                  kernel_initializer=tf.random_normal_initializer(
+                                      stddev=np.sqrt(1 / hid2_size)),
+                                  name="h3")
             out = tf.layers.dense(out, 1,
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(1 / hid3_size)),
@@ -107,7 +107,8 @@ class NNValueFunction(object):
             self.out = tf.squeeze(out)
             self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
             self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
-            optimizer = tf.train.AdamOptimizer(self.lr)
+            optimizer = tf.train.AdamOptimizer(0.00003)
+            # optimizer = tf.train.MomentumOptimizer(1e-3, 0.9, use_nesterov=True)
             self.train_op = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
         self.sess = tf.Session(graph=self.g)
@@ -123,13 +124,15 @@ class NNValueFunction(object):
         """
         y_hat = self.predict(x)
         old_exp_var = 1 - np.var(y - y_hat)/np.var(y)
-        if self.replay_buffer_x is None:
-            x_train, y_train = x, y
-        else:
-            x_train = np.concatenate([x, self.replay_buffer_x])
-            y_train = np.concatenate([y, self.replay_buffer_y])
-        self.replay_buffer_x = x
-        self.replay_buffer_y = y
+        # TODO: Needs ablation after next baseline established
+        # if self.replay_buffer_x is None:
+        #     x_train, y_train = x, y
+        # else:
+        #     x_train = np.concatenate([x, self.replay_buffer_x])
+        #     y_train = np.concatenate([y, self.replay_buffer_y])
+        # self.replay_buffer_x = x
+        # self.replay_buffer_y = y
+        x_train, y_train = x, y
         for e in range(self.epochs):
             x_train, y_train = shuffle(x_train, y_train)
             for j in range(x.shape[0] // self.batch_size):
