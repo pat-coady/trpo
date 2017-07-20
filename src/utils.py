@@ -27,9 +27,21 @@ class Scaler(object):
         return self.means, np.sqrt(self.vars)
 
 
+class ConstantScaler(object):
+    """ Dumb scaler, scale and offset set at initialization """
+    def __init__(self, obs_dim, scale=1.0, offset=0.0):
+        self.scale = np.ones(obs_dim) * scale
+        self.offset = np.zeros(obs_dim) + offset
+
+    def update(self, x):
+        pass  # no updates for constant scaler
+
+    def get(self):
+        return self.scale, self.offset
+
+
 class Logger(object):
-    def __init__(self, logname):
-        now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")
+    def __init__(self, logname, now):
         path = os.path.join('log-files', logname, now)
         os.makedirs(path)
         filenames = glob.glob('*.py')  # put copy of all python files in log_dir

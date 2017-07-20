@@ -8,6 +8,7 @@ class Policy(object):
         self.kl_targ = kl_targ
         self._build_graph(obs_dim, act_dim)
         self._init_session()
+        self.lr = None
 
     def _build_graph(self, obs_dim, act_dim):
         """ Build TensorFlow graph"""
@@ -33,22 +34,32 @@ class Policy(object):
 
     def _policy_nn(self, obs_dim, act_dim):
         """ Neural net for policy approximation function """
-        out = tf.layers.dense(self.obs_ph, 200, tf.tanh,
+        # hid1_size = obs_dim * 5
+        # hid3_size = act_dim * 5
+        # hid2_size = int(np.sqrt(hid1_size * hid3_size))
+        hid1_size = 200
+        hid2_size = 100
+        hid3_size = 50
+        num_params = obs_dim*hid1_size + hid1_size*hid2_size + hid2_size*hid3_size
+        # self.lr = 1.0 / num_params / 10
+        self.lr = 0.00003
+        out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
                                   stddev=np.sqrt(1 / obs_dim)),
                               name="h1")
-        out = tf.layers.dense(out, 100, tf.tanh,
+        out = tf.layers.dense(out, hid2_size, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
-                                  stddev=np.sqrt(1 / 200)),
+                                  stddev=np.sqrt(1 / hid1_size)),
                               name="h2")
-        out = tf.layers.dense(out, 50, tf.tanh,
+        out = tf.layers.dense(out, hid3_size, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
-                                  stddev=np.sqrt(1 / 100)),
+                                  stddev=np.sqrt(1 / hid2_size)),
                               name="h3")
         self.means = tf.layers.dense(out, act_dim,
                                      kernel_initializer=tf.random_normal_initializer(
-                                         stddev=np.sqrt(1 / 50)),
+                                         stddev=np.sqrt(1 / hid3_size)),
                                      name="means")
+        # TODO: Ablation on this:
         log_vars = tf.get_variable('logvars', (3, act_dim), tf.float32, tf.constant_initializer(0.0))
         self.log_vars = tf.reduce_sum(log_vars, axis=0) - 1.0
 
@@ -87,14 +98,12 @@ class Policy(object):
                             tf.exp(self.log_vars / 2.0) * tf.random_normal(shape=(act_dim,)))
 
     def _loss_train_op(self):
-        # TODO: use reduce_mean or reduce_sum?
         loss1 = -tf.reduce_mean(self.advantages_ph *
                                 tf.exp(self.logp - self.logp_old))
         loss2 = tf.reduce_mean(self.beta_ph * self.kl)
         loss3 = self.eta_ph * tf.square(tf.maximum(0.0, self.kl - 2.0 * self.kl_targ))
         self.loss = loss1 + loss2 + loss3
-        optimizer = tf.train.AdamOptimizer(0.00003)
-        # optimizer = tf.train.MomentumOptimizer(learning_rate=0.001, momentum=0.9, use_nesterov=True)
+        optimizer = tf.train.AdamOptimizer(self.lr)
         self.train_op = optimizer.minimize(self.loss)
 
     def _init_session(self):
