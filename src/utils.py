@@ -11,24 +11,33 @@ import csv
 
 
 class Scaler(object):
-    def __init__(self, obs_dim, alpha=0.05):
-        self.vars = np.zeros(obs_dim) + 1.0
+    def __init__(self, obs_dim):
+        self.vars = np.zeros(obs_dim)
         self.means = np.zeros(obs_dim)
+        self.m = 0
+        self.n = 0
         self.first_pass = True
-        self.alpha = alpha
 
-    def update_scale(self, x):
-
+    def update(self, x):
         if self.first_pass:
-            self.vars = np.var(x, axis=0)
             self.means = np.mean(x, axis=0)
+            self.vars = np.var(x, axis=0)
+            self.m = x.shape[0]
             self.first_pass = False
         else:
-            self.vars += self.alpha * (np.var(x, axis=0) - self.vars)
-            self.means += self.alpha * (np.mean(x, axis=0) - self.means)
+            n = x.shape[0]
+            new_data_var = np.var(x, axis=0)
+            new_data_mean = np.mean(x, axis=0)
+            new_data_mean_sq = np.square(new_data_mean)
+            new_means = ((self.means * self.m) + (new_data_mean * n)) / (self.m + n)
+            self.vars = (((self.m * (self.vars + np.square(self.means))) +
+                          (n * (new_data_var + new_data_mean_sq))) / (self.m + n) -
+                         np.square(new_means))
+            self.means = new_means
+            self.m += n
 
-    def get_scale(self):
-        return self.means, np.sqrt(self.vars)
+    def get(self):
+        return self.means, 1/(np.sqrt(self.vars) + 0.1)/3
 
 
 class ConstantScaler(object):
