@@ -37,7 +37,8 @@ class Scaler(object):
             self.m += n
 
     def get(self):
-        return self.means, 1/(np.sqrt(self.vars) + 0.1)/3
+        """ resturns 2-tuple: (scale, offset) """
+        return 1/(np.sqrt(self.vars) + 0.1)/3, self.means
 
 
 class ConstantScaler(object):
@@ -50,6 +51,7 @@ class ConstantScaler(object):
         pass  # no updates for constant scaler
 
     def get(self):
+        """ resturns 2-tuple: (scale, offset) """
         return self.scale, self.offset
 
 
