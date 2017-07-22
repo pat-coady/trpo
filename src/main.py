@@ -26,10 +26,10 @@ the MuJoCo control tasks.
 """
 import gym
 from gym import wrappers
-from policy import *
-from value_function import *
+from policy import Policy
+from value_function import NNValueFunction
 import scipy.signal
-from utils import Logger, Scaler, ConstantScaler
+from utils import Logger, Scaler
 from datetime import datetime
 import os
 
@@ -268,9 +268,7 @@ def main(num_iter=5000,
     logger = Logger(logname=env_name, now=now)
     aigym_path = os.path.join('/tmp', env_name, now)
     env = wrappers.Monitor(env, aigym_path, force=True)
-    # scaler = ConstantScaler(obs_dim, 1.0 / 3, 0.0)
     scaler = Scaler(obs_dim)
-    lin_val_func = LinearValueFunction()
     val_func = NNValueFunction(obs_dim)
     policy = Policy(obs_dim, act_dim)
     # a few runs of untrained policy to initialize scaler:
@@ -288,7 +286,6 @@ def main(num_iter=5000,
         log_batch_stats(observes, actions, advantages, disc_sum_rew, logger)
         policy.update(observes, actions, advantages, logger)  # update policy
         val_func.fit(observes, disc_sum_rew, logger)  # update value function
-        lin_val_func.fit(observes, disc_sum_rew, logger)  # simple linear valF
         logger.write(display=True)  # write logger results to file and stdout
     logger.close()
     policy.close_sess()

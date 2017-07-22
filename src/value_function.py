@@ -108,7 +108,6 @@ class NNValueFunction(object):
             self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
             self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
             optimizer = tf.train.AdamOptimizer(0.00003)
-            # optimizer = tf.train.MomentumOptimizer(1e-3, 0.9, use_nesterov=True)
             self.train_op = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
         self.sess = tf.Session(graph=self.g)
@@ -124,7 +123,6 @@ class NNValueFunction(object):
         """
         y_hat = self.predict(x)
         old_exp_var = 1 - np.var(y - y_hat)/np.var(y)
-        # TODO: Needs ablation after next baseline established
         if self.replay_buffer_x is None:
             x_train, y_train = x, y
         else:
@@ -132,7 +130,6 @@ class NNValueFunction(object):
             y_train = np.concatenate([y, self.replay_buffer_y])
         self.replay_buffer_x = x
         self.replay_buffer_y = y
-        # x_train, y_train = x, y
         for e in range(self.epochs):
             x_train, y_train = shuffle(x_train, y_train)
             for j in range(x.shape[0] // self.batch_size):
