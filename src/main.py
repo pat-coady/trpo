@@ -16,7 +16,7 @@ https://arxiv.org/abs/1707.02286 (Heess et al., 2017)
 Generalized Advantage Estimation:
 https://arxiv.org/pdf/1506.02438.pdf
 
-And, also, this GitHub repo which was a big help to me during
+And, also, this GitHub repo which was helpful to me during
 implementation:
 https://github.com/joschu/modular_rl
 

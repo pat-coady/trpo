@@ -81,7 +81,7 @@ class Policy(object):
                                      kernel_initializer=tf.random_normal_initializer(
                                          stddev=np.sqrt(1 / hid3_size)),
                                      name="means")
-        log_vars = tf.get_variable('logvars', (3, self.act_dim), tf.float32,
+        log_vars = tf.get_variable('logvars', (10, self.act_dim), tf.float32,
                                    tf.constant_initializer(0.0))
         self.log_vars = tf.reduce_sum(log_vars, axis=0) - 1.0
 

@@ -125,14 +125,14 @@ class NNValueFunction(object):
         y_hat = self.predict(x)
         old_exp_var = 1 - np.var(y - y_hat)/np.var(y)
         # TODO: Needs ablation after next baseline established
-        # if self.replay_buffer_x is None:
-        #     x_train, y_train = x, y
-        # else:
-        #     x_train = np.concatenate([x, self.replay_buffer_x])
-        #     y_train = np.concatenate([y, self.replay_buffer_y])
-        # self.replay_buffer_x = x
-        # self.replay_buffer_y = y
-        x_train, y_train = x, y
+        if self.replay_buffer_x is None:
+            x_train, y_train = x, y
+        else:
+            x_train = np.concatenate([x, self.replay_buffer_x])
+            y_train = np.concatenate([y, self.replay_buffer_y])
+        self.replay_buffer_x = x
+        self.replay_buffer_y = y
+        # x_train, y_train = x, y
         for e in range(self.epochs):
             x_train, y_train = shuffle(x_train, y_train)
             for j in range(x.shape[0] // self.batch_size):

@@ -7,7 +7,7 @@ def df_plot(dfs, x, ys, ylim=None, legend_loc='best'):
     Args:
         dfs: list of pandas dataframes
         x: str column label for x variable
-        y: list of str column labels for y variable(s)
+        ys: list of str column labels for y variable(s)
         ylim: tuple to override automatic y-axis limits
         legend_loc: str to override automatic legend placement:
             'upper left', 'lower left', 'lower right' , 'right' ,
@@ -20,7 +20,7 @@ def df_plot(dfs, x, ys, ylim=None, legend_loc='best'):
         if '_' in name:
             name = name.split('_')[1]
         for y in ys:
-            plt.plot(df[x], df[y], linewidth=2,
+            plt.plot(df[x], df[y], linewidth=1,
                      label=name + ' ' + y.replace('_', ''))
     plt.xlabel(x.replace('_', ''))
     plt.legend(loc=legend_loc)

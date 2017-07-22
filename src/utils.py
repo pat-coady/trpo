@@ -37,7 +37,7 @@ class Scaler(object):
             self.m += n
 
     def get(self):
-        """ resturns 2-tuple: (scale, offset) """
+        """ returns 2-tuple: (scale, offset) """
         return 1/(np.sqrt(self.vars) + 0.1)/3, self.means
 
 
