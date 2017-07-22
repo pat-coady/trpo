@@ -25,6 +25,7 @@ in the OpenAI Gym (https://gym.openai.com/). Testing focused on
 the MuJoCo control tasks.
 """
 import gym
+import numpy as np
 from gym import wrappers
 from policy import Policy
 from value_function import NNValueFunction
@@ -218,7 +219,7 @@ def build_train_set(trajectories):
 
     Args:
         trajectories: trajectories after processing by add_disc_sum_rew(),
-     add_value(), add_advantage() or add_gae()
+            add_value(), add_advantage() or add_gae()
 
     Returns: 4-tuple of NumPy arrays
         observes: shape = (N, obs_dim)
