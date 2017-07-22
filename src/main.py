@@ -28,7 +28,7 @@ import gym
 import numpy as np
 from gym import wrappers
 from policy import Policy
-from value_function import NNValueFunction
+from value_function import NNValueFunction, LinearValueFunction
 import scipy.signal
 from utils import Logger, Scaler
 from datetime import datetime
@@ -262,7 +262,7 @@ def main(num_iter=5000,
          gamma=0.995,
          lam=0.98):
 
-    env_name = 'Hopper-v1'
+    env_name = 'InvertedDoublePendulum-v1'
     env, obs_dim, act_dim = init_gym(env_name)
     obs_dim += 1  # add 1 to obs dimension for timestep feature (see run_episode())
     now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")  # create unique directories
@@ -271,6 +271,7 @@ def main(num_iter=5000,
     env = wrappers.Monitor(env, aigym_path, force=True)
     scaler = Scaler(obs_dim)
     val_func = NNValueFunction(obs_dim)
+    lin_val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
     # a few runs of untrained policy to initialize scaler:
     run_policy(env, policy, scaler, logger, min_steps=500, min_episodes=5)
@@ -287,6 +288,7 @@ def main(num_iter=5000,
         log_batch_stats(observes, actions, advantages, disc_sum_rew, logger)
         policy.update(observes, actions, advantages, logger)  # update policy
         val_func.fit(observes, disc_sum_rew, logger)  # update value function
+        lin_val_func.fit(observes, disc_sum_rew, logger)  # lin value func, for comparison
         logger.write(display=True)  # write logger results to file and stdout
     logger.close()
     policy.close_sess()

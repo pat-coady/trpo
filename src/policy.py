@@ -56,15 +56,18 @@ class Policy(object):
          action based on observation. Trainable variables hold log variances
          for each action dimension (i.e. variances not determined by NN).
         """
-        # hid1_size = obs_dim * 5
-        # hid3_size = act_dim * 5
-        # hid2_size = int(np.sqrt(hid1_size * hid3_size))
-        hid1_size = 200
-        hid2_size = 100
-        hid3_size = 50
-        # num_params = self.obs_dim*hid1_size + hid1_size*hid2_size + hid2_size*hid3_size
-        # self.lr = 1.0 / num_params / 10
-        self.lr = 0.00003
+        hid1_size = self.obs_dim * 16
+        hid3_size = self.act_dim * 16
+        hid2_size = int(np.sqrt(hid1_size * hid3_size))
+        # hid1_size = 200
+        # hid2_size = 100
+        # hid3_size = 50
+        num_params = self.obs_dim*hid1_size + hid1_size*hid2_size + hid2_size*hid3_size
+        self.lr = 15 * 1e-4 / hid3_size
+        logvar_speed = hid3_size // 5
+        # self.lr = 0.00003
+        print('Policy Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}, logvar_speed: {}'
+              .format(hid1_size, hid2_size, hid3_size, self.lr, logvar_speed))
         out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
                                   stddev=np.sqrt(1 / self.obs_dim)),
@@ -81,7 +84,7 @@ class Policy(object):
                                      kernel_initializer=tf.random_normal_initializer(
                                          stddev=np.sqrt(1 / hid3_size)),
                                      name="means")
-        log_vars = tf.get_variable('logvars', (10, self.act_dim), tf.float32,
+        log_vars = tf.get_variable('logvars', (logvar_speed, self.act_dim), tf.float32,
                                    tf.constant_initializer(0.0))
         self.log_vars = tf.reduce_sum(log_vars, axis=0) - 1.0
 

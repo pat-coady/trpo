@@ -79,15 +79,16 @@ class NNValueFunction(object):
         with self.g.as_default():
             self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
             self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
-            # hid1_size = self.obs_dim * 5
-            # hid3_size = 5
-            # hid2_size = int(np.sqrt(hid1_size * hid3_size))
-            hid1_size = 200
-            hid2_size = 50
-            hid3_size = 25
-            num_params = self.obs_dim * hid1_size + hid1_size * hid2_size + hid2_size * hid3_size
-            # self.lr = 1.0 / num_params / 3.0
-            self.lr = 1e-3
+            hid1_size = self.obs_dim * 16
+            hid3_size = 10
+            hid2_size = int(np.sqrt(hid1_size * hid3_size))
+            # hid1_size = 200
+            # hid2_size = 50
+            # hid3_size = 25
+            self.lr = 5e-3 * 2.5 / hid3_size
+            # self.lr = 1e-3
+            print('Value Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}'
+                  .format(hid1_size, hid2_size, hid3_size, self.lr))
             out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(1 / self.obs_dim)),
