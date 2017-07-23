@@ -98,7 +98,7 @@ def run_episode(env, policy, scaler, animate=False):
             np.array(rewards, dtype=np.float64), np.concatenate(unscaled_obs))
 
 
-def run_policy(env, policy, scaler, logger, min_steps, min_episodes):
+def run_policy(env, policy, scaler, logger, episodes):
     """ Run policy and collect data for a minimum of min_steps and min_episodes
 
     Args:
@@ -107,8 +107,7 @@ def run_policy(env, policy, scaler, logger, min_steps, min_episodes):
         scaler: scaler object, used to scale/offset each observation dimension
             to a similar range
         logger: logger object, used to save stats from episodes
-        min_steps: minimum total steps to run
-        min_episodes: minimum total episodes to run
+        episodes: total episodes to run
 
     Returns: list of trajectory dictionaries, list length = number of episodes
         'observes' : NumPy array of states from episode
@@ -118,7 +117,7 @@ def run_policy(env, policy, scaler, logger, min_steps, min_episodes):
     """
     total_steps, total_episodes = (0, 0)
     trajectories = []
-    while not (total_steps >= min_steps and total_episodes >= min_episodes):
+    for e in range(episodes):
         observes, actions, rewards, unscaled_obs = run_episode(env, policy, scaler)
         total_steps += observes.shape[0]
         total_episodes += 1
@@ -237,7 +236,7 @@ def build_train_set(trajectories):
     return observes, actions, advantages, disc_sum_rew
 
 
-def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger):
+def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode):
     """ Log various batch statistics"""
     logger.log({'_mean_obs': np.mean(observes),
                 '_min_obs': np.min(observes),
@@ -255,6 +254,7 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger):
                 '_min_discrew': np.min(disc_sum_rew),
                 '_max_discrew': np.max(disc_sum_rew),
                 '_std_discrew': np.var(disc_sum_rew),
+                'Episode': episode
                 })
 
 
@@ -262,7 +262,7 @@ def main(num_iter=5000,
          gamma=0.995,
          lam=0.98):
 
-    env_name = 'InvertedDoublePendulum-v1'
+    env_name = 'Humanoid-v1'
     env, obs_dim, act_dim = init_gym(env_name)
     obs_dim += 1  # add 1 to obs dimension for timestep feature (see run_episode())
     now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")  # create unique directories
@@ -274,21 +274,22 @@ def main(num_iter=5000,
     lin_val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
     # a few runs of untrained policy to initialize scaler:
-    run_policy(env, policy, scaler, logger, min_steps=500, min_episodes=5)
+    run_policy(env, policy, scaler, logger, episodes=5)
+    episode = 0
     for i in range(num_iter):
         logger.log({'_Iteration': i})
-        trajectories = run_policy(env, policy, scaler, logger,
-                                  min_steps=5000, min_episodes=20)
+        trajectories = run_policy(env, policy, scaler, logger, episodes=20)
+        episode += len(trajectories)
         add_value(trajectories, val_func)  # add estimated values to episodes
         add_disc_sum_rew(trajectories, gamma)  # calculated discounted sum of Rs
         add_gae(trajectories, gamma, lam)  # calculate advantage
         # concatenate all episodes into single NumPy arrays
         observes, actions, advantages, disc_sum_rew = build_train_set(trajectories)
         # add various stats to training log:
-        log_batch_stats(observes, actions, advantages, disc_sum_rew, logger)
+        log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode)
         policy.update(observes, actions, advantages, logger)  # update policy
         val_func.fit(observes, disc_sum_rew, logger)  # update value function
-        lin_val_func.fit(observes, disc_sum_rew, logger)  # lin value func, for comparison
+        # lin_val_func.fit(observes, disc_sum_rew, logger)  # lin value func, for comparison
         logger.write(display=True)  # write logger results to file and stdout
     logger.close()
     policy.close_sess()

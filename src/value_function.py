@@ -82,11 +82,7 @@ class NNValueFunction(object):
             hid1_size = self.obs_dim * 16
             hid3_size = 10
             hid2_size = int(np.sqrt(hid1_size * hid3_size))
-            # hid1_size = 200
-            # hid2_size = 50
-            # hid3_size = 25
-            self.lr = 5e-3 * 2.5 / hid3_size
-            # self.lr = 1e-3
+            self.lr = 1e-3 * 43 / hid2_size
             print('Value Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}'
                   .format(hid1_size, hid2_size, hid3_size, self.lr))
             out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
