@@ -34,6 +34,7 @@ import scipy.signal
 from utils import Logger, Scaler
 from datetime import datetime
 import os
+import argparse
 
 
 def init_gym(env_name):
@@ -244,15 +245,19 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode
                 '_min_discrew': np.min(disc_sum_rew),
                 '_max_discrew': np.max(disc_sum_rew),
                 '_std_discrew': np.var(disc_sum_rew),
-                'Episode': episode
+                '_Episode': episode
                 })
 
 
-def main(env_name='InvertedPendulum-v1',
-         max_iter=5000,
-         gamma=0.995,  # reward discount factor
-         lam=0.98):  # lambda from Generalized Advantage Estimate (add_gae())
+def main(env_name, max_episodes, gamma, lam):
+    """ Main training loop
 
+    Args:
+        env_name: OpenAI Gym environment name, e.g. 'Hopper-v1'
+        max_episodes: maximum number of episodes to run
+        gamma: reward discount factor (float)
+        lam: lambda from Generalized Advantage Estimate
+    """
     env, obs_dim, act_dim = init_gym(env_name)
     obs_dim += 1  # add 1 to obs dimension for time step feature (see run_episode())
     now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")  # create unique directories
@@ -265,8 +270,7 @@ def main(env_name='InvertedPendulum-v1',
     # run a few episodes of untrained policy to initialize scaler:
     run_policy(env, policy, scaler, logger, episodes=5)
     episode = 0
-    for i in range(max_iter):
-        logger.log({'_Iteration': i})
+    while episode < max_episodes:
         trajectories = run_policy(env, policy, scaler, logger, episodes=20)
         episode += len(trajectories)
         add_value(trajectories, val_func)  # add estimated values to episodes
@@ -285,4 +289,12 @@ def main(env_name='InvertedPendulum-v1',
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Train policy using Proximal Policy Optimizer')
+    parser.add_argument('-e', '--env_name', type=str, help='OpenAI Gym environment name')
+    parser.add_argument('-m', '--max_episodes', type=int, help='Maximum number of episodes to run',
+                        default=1000)
+    parser.add_argument('-g', '--gamma', type=float, help='Discount factor', default=0.995)
+    parser.add_argument('-l', '--lam', type=float, help='Lambda for Generalized Advantage Estimation',
+                        default=0.98)
+    args = parser.parse_args()
+    main(**vars(args))
