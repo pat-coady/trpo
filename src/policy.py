@@ -82,7 +82,8 @@ class Policy(object):
                                      name="means")
         # logvar_speed is used to 'fool' gradient descent into making faster updates
         # to log-variance. speed is chosen heuristically based on network size.
-        logvar_speed = (10 * np.sqrt(hid2_size)) // np.sqrt(96)
+        # logvar_speed = (10 * np.sqrt(hid2_size)) // np.sqrt(96)
+        logvar_speed = (10 * hid2_size) // 96
         log_vars = tf.get_variable('logvars', (logvar_speed, self.act_dim), tf.float32,
                                    tf.constant_initializer(0.0))
         self.log_vars = tf.reduce_sum(log_vars, axis=0) - 1.0

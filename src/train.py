@@ -136,7 +136,7 @@ def run_policy(env, policy, scaler, logger, episodes):
 
 
 def discount(x, gamma):
-    """Calculate discounted forward sum of a sequence at each point"""
+    """ Calculate discounted forward sum of a sequence at each point """
     return scipy.signal.lfilter([1.0], [1.0, -gamma], x[::-1])[::-1]
 
 
@@ -192,7 +192,10 @@ def add_gae(trajectories, gamma, lam):
         None (mutates trajectories dictionary to add 'advantages')
     """
     for trajectory in trajectories:
-        rewards = trajectory['rewards'] * (1 - gamma)
+        if gamma < 0.999:  # don't scale for gamma ~= 1
+            rewards = trajectory['rewards'] * (1 - gamma)
+        else:
+            rewards = trajectory['rewards']
         values = trajectory['values']
         # temporal differences
         tds = rewards - values + np.append(values[1:] * gamma, 0)
@@ -205,7 +208,7 @@ def build_train_set(trajectories):
 
     Args:
         trajectories: trajectories after processing by add_disc_sum_rew(),
-            add_value(), add_advantage() or add_gae()
+            add_value(), and add_gae()
 
     Returns: 4-tuple of NumPy arrays
         observes: shape = (N, obs_dim)
@@ -218,13 +221,13 @@ def build_train_set(trajectories):
     disc_sum_rew = np.concatenate([t['disc_sum_rew'] for t in trajectories])
     advantages = np.concatenate([t['advantages'] for t in trajectories])
     # normalize advantages
-    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-6)
 
     return observes, actions, advantages, disc_sum_rew
 
 
 def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode):
-    """ Log various batch statistics"""
+    """ Log various batch statistics """
     logger.log({'_mean_obs': np.mean(observes),
                 '_min_obs': np.min(observes),
                 '_max_obs': np.max(observes),
@@ -245,10 +248,10 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode
                 })
 
 
-def main(env_name='InvertedPendulum-v1',
-         num_iter=5000,
-         gamma=0.995,
-         lam=0.98):
+def main(env_name='Humanoid-v1',
+         max_iter=5000,
+         gamma=0.995,  # reward discount factor
+         lam=0.98):  # lambda from Generalized Advantage Estimate (add_gae())
 
     env, obs_dim, act_dim = init_gym(env_name)
     obs_dim += 1  # add 1 to obs dimension for time step feature (see run_episode())
@@ -258,12 +261,11 @@ def main(env_name='InvertedPendulum-v1',
     env = wrappers.Monitor(env, aigym_path, force=True)
     scaler = Scaler(obs_dim)
     val_func = NNValueFunction(obs_dim)
-    # lin_val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
-    # a few runs of untrained policy to initialize scaler:
+    # run a few episodes of untrained policy to initialize scaler:
     run_policy(env, policy, scaler, logger, episodes=5)
     episode = 0
-    for i in range(num_iter):
+    for i in range(max_iter):
         logger.log({'_Iteration': i})
         trajectories = run_policy(env, policy, scaler, logger, episodes=20)
         episode += len(trajectories)
@@ -276,7 +278,6 @@ def main(env_name='InvertedPendulum-v1',
         log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode)
         policy.update(observes, actions, advantages, logger)  # update policy
         val_func.fit(observes, disc_sum_rew, logger)  # update value function
-        # lin_val_func.fit(observes, disc_sum_rew, logger)  # lin value func, for comparison
         logger.write(display=True)  # write logger results to file and stdout
     logger.close()
     policy.close_sess()

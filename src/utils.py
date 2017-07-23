@@ -33,7 +33,8 @@ class Scaler(object):
         Args:
             x: 2D NumPy array, shape = (N, obs_dim)
 
-        see: https://stats.stackexchange.com/questions/43159/how-to-calculate-pooled-variance-of-two-groups-given-known-group-variances-mean
+        see: https://stats.stackexchange.com/questions/43159/how-to-calculate-pooled-
+               variance-of-two-groups-given-known-group-variances-mean
         """
         if self.first_pass:
             self.means = np.mean(x, axis=0)
