@@ -248,7 +248,7 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode
                 })
 
 
-def main(env_name='Humanoid-v1',
+def main(env_name='InvertedPendulum-v1',
          max_iter=5000,
          gamma=0.995,  # reward discount factor
          lam=0.98):  # lambda from Generalized Advantage Estimate (add_gae())

@@ -1,3 +1,12 @@
+"""
+Short Plotting Routine to Plot Pandas Dataframes by Column Label
+
+1. Takes list of dateframes to compare multiple trials
+2. Takes list of y-variables to combine on 1 plot
+3. Legend location and y-axis limits can be customized
+
+Written by Patrick Coady (pat-coady.github.io)
+"""
 import matplotlib.pyplot as plt
 
 
