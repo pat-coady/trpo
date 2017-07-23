@@ -28,7 +28,7 @@ import gym
 import numpy as np
 from gym import wrappers
 from policy import Policy
-from value_function import NNValueFunction, LinearValueFunction
+from value_function import NNValueFunction
 import scipy.signal
 from utils import Logger, Scaler
 from datetime import datetime
@@ -175,20 +175,6 @@ def add_value(trajectories, val_func):
         trajectory['values'] = values
 
 
-def add_advantage(trajectories):
-    """ Adds estimated advantage to all timesteps of all trajectories
-
-    Args:
-        trajectories: as returned by run_policy(), must include 'values'
-            key from add_value().
-
-    Returns:
-        None (mutates trajectories dictionary to add 'advantages')
-    """
-    for trajectory in trajectories:
-        trajectory['advantages'] = trajectory['disc_sum_rew'] - trajectory['values']
-
-
 def add_gae(trajectories, gamma, lam):
     """ Add generalized advantage estimator.
     https://arxiv.org/pdf/1506.02438.pdf
@@ -258,11 +244,11 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode
                 })
 
 
-def main(num_iter=5000,
+def main(env_name='Hopper-v1',
+         num_iter=5000,
          gamma=0.995,
          lam=0.98):
 
-    env_name = 'Humanoid-v1'
     env, obs_dim, act_dim = init_gym(env_name)
     obs_dim += 1  # add 1 to obs dimension for timestep feature (see run_episode())
     now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")  # create unique directories
@@ -271,7 +257,7 @@ def main(num_iter=5000,
     env = wrappers.Monitor(env, aigym_path, force=True)
     scaler = Scaler(obs_dim)
     val_func = NNValueFunction(obs_dim)
-    lin_val_func = LinearValueFunction()
+    # lin_val_func = LinearValueFunction()
     policy = Policy(obs_dim, act_dim)
     # a few runs of untrained policy to initialize scaler:
     run_policy(env, policy, scaler, logger, episodes=5)

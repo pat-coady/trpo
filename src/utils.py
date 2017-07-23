@@ -33,26 +33,13 @@ class Scaler(object):
             self.vars = (((self.m * (self.vars + np.square(self.means))) +
                           (n * (new_data_var + new_data_mean_sq))) / (self.m + n) -
                          np.square(new_means))
+            self.vars = np.maximum(0.0, self.vars)
             self.means = new_means
             self.m += n
 
     def get(self):
         """ returns 2-tuple: (scale, offset) """
         return 1/(np.sqrt(self.vars) + 0.1)/3, self.means
-
-
-class ConstantScaler(object):
-    """ Dumb scaler, scale and offset set at initialization """
-    def __init__(self, obs_dim, scale=1.0, offset=0.0):
-        self.scale = np.ones(obs_dim) * scale
-        self.offset = np.zeros(obs_dim) + offset
-
-    def update(self, x):
-        pass  # no updates for constant scaler
-
-    def get(self):
-        """ resturns 2-tuple: (scale, offset) """
-        return self.scale, self.offset
 
 
 class Logger(object):

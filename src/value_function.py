@@ -9,52 +9,6 @@ import numpy as np
 from sklearn.utils import shuffle
 
 
-class LinearValueFunction(object):
-    """Simple linear regression value function, uses linear and squared features.
-
-    Mostly copied from: https://github.com/joschu/modular_rl
-    """
-    def __init__(self):
-        self.coef = None
-
-    def fit(self, x, y, logger):
-        """ Fit model - (i.e. solve normal equations)
-
-        Args:
-            x: features
-            y: target
-            logger: logger to save training loss and % explained variance
-        """
-        y_hat = self.predict(x)
-        old_exp_var = 1-np.var(y-y_hat)/np.var(y)
-        xp = self.preproc(x)
-        a = xp.T.dot(xp)
-        nfeats = xp.shape[1]
-        a[np.arange(nfeats), np.arange(nfeats)] += 1e-3  # a little ridge regression
-        b = xp.T.dot(y)
-        self.coef = np.linalg.solve(a, b)
-        y_hat = self.predict(x)
-        loss = np.mean(np.square(y_hat-y))
-        exp_var = 1-np.var(y-y_hat)/np.var(y)
-
-        logger.log({'LinValFuncLoss': loss,
-                    'LinExplainedVarNew': exp_var,
-                    'LinExplainedVarOld': old_exp_var})
-
-    def predict(self, x):
-        """ Predict method, predict zeros if model untrained """
-        if self.coef is None:
-            return np.zeros(x.shape[0])
-        else:
-            return self.preproc(x).dot(self.coef)
-
-    @staticmethod
-    def preproc(X):
-        """ Generate squared features and bias term """
-
-        return np.concatenate([np.ones([X.shape[0], 1]), X, np.square(X)/2.0], axis=1)
-
-
 class NNValueFunction(object):
     """ NN-based state-value function """
     def __init__(self, obs_dim):
@@ -82,7 +36,7 @@ class NNValueFunction(object):
             hid1_size = self.obs_dim * 16
             hid3_size = 10
             hid2_size = int(np.sqrt(hid1_size * hid3_size))
-            self.lr = 1e-3 * 43 / hid2_size
+            self.lr = 1e-3 * np.sqrt(43) / np.sqrt(hid2_size)
             print('Value Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}'
                   .format(hid1_size, hid2_size, hid3_size, self.lr))
             out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
@@ -103,8 +57,8 @@ class NNValueFunction(object):
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             self.out = tf.squeeze(out)
             self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
-            self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
-            optimizer = tf.train.AdamOptimizer(0.00003)
+            # self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
+            optimizer = tf.train.AdamOptimizer(self.lr)
             self.train_op = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
         self.sess = tf.Session(graph=self.g)

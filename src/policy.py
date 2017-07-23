@@ -59,8 +59,9 @@ class Policy(object):
         hid1_size = self.obs_dim * 16
         hid3_size = self.act_dim * 16
         hid2_size = int(np.sqrt(hid1_size * hid3_size))
-        self.lr = 3e-5 * 96 / hid2_size
-        logvar_speed = (10 * hid2_size) // 96
+        self.lr = 3e-5 * np.sqrt(96) / np.sqrt(hid2_size)
+        logvar_speed = (10 * np.sqrt(hid2_size)) // np.sqrt(96)
+        # logvar_speed = 10
         print('Policy Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}, logvar_speed: {}'
               .format(hid1_size, hid2_size, hid3_size, self.lr, logvar_speed))
         out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
