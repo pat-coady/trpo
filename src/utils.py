@@ -11,9 +11,9 @@ import csv
 
 
 class Scaler(object):
-    """ Generate scale and offset based on running mean and stddev of axis=0
+    """ Generate scale and offset based on running mean and stddev along axis=0
 
-        offset = running mean of all data
+        offset = running mean
         scale = 1 / (stddev + 0.1) / 3 (i.e. 3x stddev = +/- 1.0)
     """
 
@@ -31,7 +31,7 @@ class Scaler(object):
     def update(self, x):
         """ Update running mean and variance (this is an exact method)
         Args:
-            x: 2D NumPy array, shape = (N, obs_dim)
+            x: NumPy array, shape = (N, obs_dim)
 
         see: https://stats.stackexchange.com/questions/43159/how-to-calculate-pooled-
                variance-of-two-groups-given-known-group-variances-mean
@@ -75,7 +75,7 @@ class Logger(object):
         path = os.path.join(path, 'log.csv')
 
         self.write_header = True
-        self.row = {}
+        self.log_entry = {}
         self.f = open(path, 'w')
         self.writer = None  # DictWriter created with first call to write() method
 
@@ -87,16 +87,14 @@ class Logger(object):
             display: boolean, print to stdout
         """
         if display:
-            self.disp(self.row)
+            self.disp(self.log_entry)
         if self.write_header:
-            fieldnames = [x for x in self.row.keys()]
+            fieldnames = [x for x in self.log_entry.keys()]
             self.writer = csv.DictWriter(self.f, fieldnames=fieldnames)
             self.writer.writeheader()
-            self.writer.writerow(self.row)
             self.write_header = False
-        else:
-            self.writer.writerow(self.row)
-        self.row = {}
+        self.writer.writerow(self.log_entry)
+        self.log_entry = {}
 
     @staticmethod
     def disp(log):
@@ -116,7 +114,7 @@ class Logger(object):
         Args:
             items: dictionary of items to update
         """
-        self.row.update(items)
+        self.log_entry.update(items)
 
     def close(self):
         """ Close log file - log cannot be written after this """
