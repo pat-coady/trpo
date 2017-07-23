@@ -4,6 +4,7 @@ Archive of Procedures Not Used in Final Implementation
 Written by Patrick Coady (pat-coady.github.io)
 """
 import numpy as np
+import tensorflow as tf
 
 
 class ConstantScaler(object):
@@ -16,7 +17,7 @@ class ConstantScaler(object):
         pass  # no updates for constant scaler
 
     def get(self):
-        """ resturns 2-tuple: (scale, offset) """
+        """ returns 2-tuple: (scale, offset) """
         return self.scale, self.offset
 
 
@@ -67,7 +68,7 @@ class LinearValueFunction(object):
 
 
 def add_advantage(trajectories):
-    """ Adds estimated advantage to all timesteps of all trajectories
+    """ Adds estimated advantage to all time steps of all trajectories
 
     Args:
         trajectories: as returned by run_policy(), must include 'values'

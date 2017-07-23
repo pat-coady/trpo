@@ -42,7 +42,7 @@ def init_gym(env_name):
     and action spaces.
 
     Args:
-        env_name: str envirornment name (e.g. "Humanoid-v1")
+        env_name: str environment name (e.g. "Humanoid-v1")
 
     Returns: 3-tuple
         gym environment (object)
@@ -77,13 +77,13 @@ def run_episode(env, policy, scaler, animate=False):
     done = False
     step = 0.0
     scale, offset = scaler.get()
-    scale[-1] = 1.0  # don't scale timestep feature
-    offset[-1] = 0.0  # don't offset timestep feature
+    scale[-1] = 1.0  # don't scale time step feature
+    offset[-1] = 0.0  # don't offset time step feature
     while not done:
         if animate:
             env.render()
         obs = obs.astype(np.float64).reshape((1, -1))
-        obs = np.append(obs, [[step]], axis=1)  # add timestep feature
+        obs = np.append(obs, [[step]], axis=1)  # add time step feature
         unscaled_obs.append(obs)
         obs = (obs - offset) * scale  # scale and offset observations
         observes.append(obs)
@@ -93,7 +93,7 @@ def run_episode(env, policy, scaler, animate=False):
         if not isinstance(reward, float):
             reward = np.asscalar(reward)
         rewards.append(reward)
-        step += 1e-3  # increment timestep feature
+        step += 1e-3  # increment time step feature
 
     return (np.concatenate(observes), np.concatenate(actions),
             np.array(rewards, dtype=np.float64), np.concatenate(unscaled_obs))
@@ -113,8 +113,8 @@ def run_policy(env, policy, scaler, logger, episodes):
     Returns: list of trajectory dictionaries, list length = number of episodes
         'observes' : NumPy array of states from episode
         'actions' : NumPy array of actions from episode
-        'rewards' : NumPy array of (undiscounted) rewards from episode
-        'unscaled_obs' : NumPy array of (undiscounted) rewards from episode
+        'rewards' : NumPy array of (un-discounted) rewards from episode
+        'unscaled_obs' : NumPy array of (un-discounted) rewards from episode
     """
     total_steps, total_episodes = (0, 0)
     trajectories = []
@@ -136,12 +136,12 @@ def run_policy(env, policy, scaler, logger, episodes):
 
 
 def discount(x, gamma):
-    """Caclulate discounted forward sum of a sequence at each point"""
+    """Calculate discounted forward sum of a sequence at each point"""
     return scipy.signal.lfilter([1.0], [1.0, -gamma], x[::-1])[::-1]
 
 
 def add_disc_sum_rew(trajectories, gamma):
-    """ Adds discounted sum of rewards to all timesteps of all trajectories
+    """ Adds discounted sum of rewards to all time steps of all trajectories
 
     Args:
         trajectories: as returned by run_policy()
@@ -160,7 +160,7 @@ def add_disc_sum_rew(trajectories, gamma):
 
 
 def add_value(trajectories, val_func):
-    """ Adds estimated value to all timesteps of all trajectories
+    """ Adds estimated value to all time steps of all trajectories
 
     Args:
         trajectories: as returned by run_policy()
@@ -245,13 +245,13 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode
                 })
 
 
-def main(env_name='Hopper-v1',
+def main(env_name='InvertedPendulum-v1',
          num_iter=5000,
          gamma=0.995,
          lam=0.98):
 
     env, obs_dim, act_dim = init_gym(env_name)
-    obs_dim += 1  # add 1 to obs dimension for timestep feature (see run_episode())
+    obs_dim += 1  # add 1 to obs dimension for time step feature (see run_episode())
     now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")  # create unique directories
     logger = Logger(logname=env_name, now=now)
     aigym_path = os.path.join('/tmp', env_name, now)

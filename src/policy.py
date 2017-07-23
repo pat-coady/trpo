@@ -46,7 +46,7 @@ class Policy(object):
         # strength of D_KL loss terms:
         self.beta_ph = tf.placeholder(tf.float32, (), 'beta')
         self.eta_ph = tf.placeholder(tf.float32, (), 'eta')
-        # log_vars and means with pi_old (previous step's policy paramters):
+        # log_vars and means with pi_old (previous step's policy parameters):
         self.old_log_vars_ph = tf.placeholder(tf.float32, (self.act_dim,), 'old_log_vars')
         self.old_means_ph = tf.placeholder(tf.float32, (None, self.act_dim), 'old_means')
 
@@ -63,8 +63,6 @@ class Policy(object):
         hid2_size = int(np.sqrt(hid1_size * hid3_size))
         # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
         self.lr = 3e-5 * np.sqrt(96) / np.sqrt(hid2_size)
-        print('Policy Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}, logvar_speed: {}'
-              .format(hid1_size, hid2_size, hid3_size, self.lr, logvar_speed))
         # 3 hidden layers with tanh activation
         out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
@@ -88,6 +86,9 @@ class Policy(object):
         log_vars = tf.get_variable('logvars', (logvar_speed, self.act_dim), tf.float32,
                                    tf.constant_initializer(0.0))
         self.log_vars = tf.reduce_sum(log_vars, axis=0) - 1.0
+
+        print('Policy Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}, logvar_speed: {}'
+              .format(hid1_size, hid2_size, hid3_size, self.lr, logvar_speed))
 
     def _logprob(self):
         """ Calculate log probabilities of a batch of observations & actions
@@ -167,7 +168,7 @@ class Policy(object):
         feed_dict[self.old_means_ph] = old_means_np
         loss, kl, entropy = 0, 0, 0
         for e in range(epochs):
-            # need to eventually improve data pipeline - refeeding data every epoch!
+            # need to eventually improve data pipeline - re-feeding data every epoch!
             self.sess.run(self.train_op, feed_dict)
             loss, kl, entropy = self.sess.run([self.loss, self.kl, self.entropy], feed_dict)
             if kl > self.kl_targ * 4:  # early stopping if D_KL diverges badly
