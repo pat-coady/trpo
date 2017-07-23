@@ -32,8 +32,8 @@ class NNValueFunction(object):
             self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
             self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
             # hid1 layer size is 16x obs_dim, hid3 size is 10, and hid2 is geometric mean
-            hid1_size = self.obs_dim * 16
-            hid3_size = 10
+            hid1_size = self.obs_dim * 16  # 16 chosen empirically on 'Hopper-v1'
+            hid3_size = 10  # 10 chosen empirically on 'Hopper-v1'
             hid2_size = int(np.sqrt(hid1_size * hid3_size))
             # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
             self.lr = 1e-3 * np.sqrt(43) / np.sqrt(hid2_size)
