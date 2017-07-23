@@ -1,5 +1,5 @@
 """
-State-Value Functions
+State-Value Function
 
 Written by Patrick Coady (pat-coady.github.io)
 """
@@ -20,7 +20,7 @@ class NNValueFunction(object):
         self.replay_buffer_y = None
         self.obs_dim = obs_dim
         self.epochs = 10
-        self.lr = None  # learning rate, set in _build_graph()
+        self.lr = None  # learning rate set in _build_graph()
         self._build_graph()
         self.sess = tf.Session(graph=self.g)
         self.sess.run(self.init)
@@ -31,30 +31,29 @@ class NNValueFunction(object):
         with self.g.as_default():
             self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
             self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
+            # hid1 layer size is 16x obs_dim, hid3 size is 10, and hid2 is geometric mean
             hid1_size = self.obs_dim * 16
             hid3_size = 10
             hid2_size = int(np.sqrt(hid1_size * hid3_size))
+            # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
             self.lr = 1e-3 * np.sqrt(43) / np.sqrt(hid2_size)
             print('Value Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}'
                   .format(hid1_size, hid2_size, hid3_size, self.lr))
+            # 3 hidden layers with tanh activations
             out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / self.obs_dim)),
-                                  name="h1")
+                                      stddev=np.sqrt(1 / self.obs_dim)), name="h1")
             out = tf.layers.dense(out, hid2_size, tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / hid1_size)),
-                                  name="h2")
+                                      stddev=np.sqrt(1 / hid1_size)), name="h2")
             out = tf.layers.dense(out, hid3_size, tf.tanh,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / hid2_size)),
-                                  name="h3")
+                                      stddev=np.sqrt(1 / hid2_size)), name="h3")
             out = tf.layers.dense(out, 1,
                                   kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / hid3_size)),
-                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
+                                      stddev=np.sqrt(1 / hid3_size)), name='output')
             self.out = tf.squeeze(out)
-            self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
+            self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))  # sqared loss
             optimizer = tf.train.AdamOptimizer(self.lr)
             self.train_op = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
@@ -71,7 +70,7 @@ class NNValueFunction(object):
         """
         num_batches = 20
         batch_size = x.shape[0] // num_batches
-        y_hat = self.predict(x)
+        y_hat = self.predict(x)  # check explained variance prior to update
         old_exp_var = 1 - np.var(y - y_hat)/np.var(y)
         if self.replay_buffer_x is None:
             x_train, y_train = x, y
@@ -89,8 +88,8 @@ class NNValueFunction(object):
                              self.val_ph: y_train[start:end]}
                 _, l = self.sess.run([self.train_op, self.loss], feed_dict=feed_dict)
         y_hat = self.predict(x)
-        loss = np.mean(np.square(y_hat - y))
-        exp_var = 1 - np.var(y - y_hat) / np.var(y)
+        loss = np.mean(np.square(y_hat - y))         # explained variance after update
+        exp_var = 1 - np.var(y - y_hat) / np.var(y)  # diagnose over-fitting of val func
 
         logger.log({'ValFuncLoss': loss,
                     'ExplainedVarNew': exp_var,

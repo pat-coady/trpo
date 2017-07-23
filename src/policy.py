@@ -63,7 +63,7 @@ class Policy(object):
         hid2_size = int(np.sqrt(hid1_size * hid3_size))
         # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
         self.lr = 3e-5 * np.sqrt(96) / np.sqrt(hid2_size)
-        # 3 hidden layers with tanh activation
+        # 3 hidden layers with tanh activations
         out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
                                   stddev=np.sqrt(1 / self.obs_dim)),
@@ -81,8 +81,7 @@ class Policy(object):
                                          stddev=np.sqrt(1 / hid3_size)),
                                      name="means")
         # logvar_speed is used to 'fool' gradient descent into making faster updates
-        # to log-variance. speed is chosen heuristically based on network size.
-        # logvar_speed = (10 * np.sqrt(hid2_size)) // np.sqrt(96)
+        # to log-variances. heuristic sets logvar_speed based on network size.
         logvar_speed = (10 * hid2_size) // 96
         log_vars = tf.get_variable('logvars', (logvar_speed, self.act_dim), tf.float32,
                                    tf.constant_initializer(0.0))
