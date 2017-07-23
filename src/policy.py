@@ -16,7 +16,8 @@ class Policy(object):
             act_dim: num action dimensions (int)
             kl_targ: target KL divergence between pi_old and pi_new
         """
-        self.beta = 1.0
+        self.beta = 1.0  # initial value for beta (D_KL loss multiplier)
+        self.eta = 100  # multiplier for hinge loss (chosen empirically)
         self.kl_targ = kl_targ
         self.lr = None
         self.obs_dim = obs_dim
@@ -56,14 +57,15 @@ class Policy(object):
          action based on observation. Trainable variables hold log variances
          for each action dimension (i.e. variances not determined by NN).
         """
+        # hidden layer sizes determined by obs_dim and act_dim (hid2 is geometric mean)
         hid1_size = self.obs_dim * 16
         hid3_size = self.act_dim * 16
         hid2_size = int(np.sqrt(hid1_size * hid3_size))
+        # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
         self.lr = 3e-5 * np.sqrt(96) / np.sqrt(hid2_size)
-        logvar_speed = (10 * np.sqrt(hid2_size)) // np.sqrt(96)
-        # logvar_speed = 10
         print('Policy Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}, logvar_speed: {}'
               .format(hid1_size, hid2_size, hid3_size, self.lr, logvar_speed))
+        # 3 hidden layers with tanh activation
         out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
                               kernel_initializer=tf.random_normal_initializer(
                                   stddev=np.sqrt(1 / self.obs_dim)),
@@ -80,6 +82,9 @@ class Policy(object):
                                      kernel_initializer=tf.random_normal_initializer(
                                          stddev=np.sqrt(1 / hid3_size)),
                                      name="means")
+        # logvar_speed is used to 'fool' gradient descent into making faster updates
+        # to log-variance. speed is chosen heuristically based on network size.
+        logvar_speed = (10 * np.sqrt(hid2_size)) // np.sqrt(96)
         log_vars = tf.get_variable('logvars', (logvar_speed, self.act_dim), tf.float32,
                                    tf.constant_initializer(0.0))
         self.log_vars = tf.reduce_sum(log_vars, axis=0) - 1.0
@@ -123,6 +128,14 @@ class Policy(object):
                             tf.random_normal(shape=(self.act_dim,)))
 
     def _loss_train_op(self):
+        """
+        Three loss terms:
+            1) standard policy gradient
+            2) D_KL(pi_old || pi_new)
+            3) Squared hinge loss on D_KL above kl_targ
+
+        See: https://arxiv.org/pdf/1707.02286.pdf
+        """
         loss1 = -tf.reduce_mean(self.advantages_ph *
                                 tf.exp(self.logp - self.logp_old))
         loss2 = tf.reduce_mean(self.beta_ph * self.kl)
@@ -154,11 +167,12 @@ class Policy(object):
         feed_dict[self.old_means_ph] = old_means_np
         loss, kl, entropy = 0, 0, 0
         for e in range(epochs):
+            # need to eventually improve data pipeline - refeeding data every epoch!
             self.sess.run(self.train_op, feed_dict)
             loss, kl, entropy = self.sess.run([self.loss, self.kl, self.entropy], feed_dict)
-            if kl > self.kl_targ * 4:
+            if kl > self.kl_targ * 4:  # early stopping if D_KL diverges badly
                 break
-        if kl > self.kl_targ * 2:
+        if kl > self.kl_targ * 2:  # tune beta to reach D_KL target (factors chosen empirically)
             self.beta *= 1.5
         elif kl < self.kl_targ / 2:
             self.beta /= 1.5

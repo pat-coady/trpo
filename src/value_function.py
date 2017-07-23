@@ -19,9 +19,7 @@ class NNValueFunction(object):
         self.replay_buffer_x = None
         self.replay_buffer_y = None
         self.obs_dim = obs_dim
-        self.batch_size = 256
         self.epochs = 10
-        self.reg = 5e-5  # regularization
         self.lr = None  # learning rate, set in _build_graph()
         self._build_graph()
         self.sess = tf.Session(graph=self.g)
@@ -57,7 +55,6 @@ class NNValueFunction(object):
                                   kernel_regularizer=tf.contrib.layers.l2_regularizer(1.0))
             self.out = tf.squeeze(out)
             self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))
-            # self.loss += tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)) * self.reg
             optimizer = tf.train.AdamOptimizer(self.lr)
             self.train_op = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
@@ -72,6 +69,8 @@ class NNValueFunction(object):
             y: target
             logger: logger to save training loss and % explained variance
         """
+        num_batches = 20
+        batch_size = x.shape[0] // num_batches
         y_hat = self.predict(x)
         old_exp_var = 1 - np.var(y - y_hat)/np.var(y)
         if self.replay_buffer_x is None:
@@ -83,9 +82,9 @@ class NNValueFunction(object):
         self.replay_buffer_y = y
         for e in range(self.epochs):
             x_train, y_train = shuffle(x_train, y_train)
-            for j in range(x.shape[0] // self.batch_size):
-                start = j * self.batch_size
-                end = (j + 1) * self.batch_size
+            for j in range(num_batches):
+                start = j * batch_size
+                end = (j + 1) * batch_size
                 feed_dict = {self.obs_ph: x_train[start:end, :],
                              self.val_ph: y_train[start:end]}
                 _, l = self.sess.run([self.train_op, self.loss], feed_dict=feed_dict)

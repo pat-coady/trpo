@@ -11,7 +11,17 @@ import csv
 
 
 class Scaler(object):
+    """ Generate scale and offset based on running mean and stddev of axis=0
+
+        offset = running mean of all data
+        scale = 1 / (stddev + 0.1) / 3 (i.e. 3x stddev = +/- 1.0)
+    """
+
     def __init__(self, obs_dim):
+        """
+        Args:
+            obs_dim: dimension of axis=1
+        """
         self.vars = np.zeros(obs_dim)
         self.means = np.zeros(obs_dim)
         self.m = 0
@@ -19,6 +29,10 @@ class Scaler(object):
         self.first_pass = True
 
     def update(self, x):
+        """ Update running mean and variance (this is an exact method)
+        Args:
+            x: 2D NumPy array, shape = (N, obs_dim)
+        """
         if self.first_pass:
             self.means = np.mean(x, axis=0)
             self.vars = np.var(x, axis=0)
@@ -33,7 +47,7 @@ class Scaler(object):
             self.vars = (((self.m * (self.vars + np.square(self.means))) +
                           (n * (new_data_var + new_data_mean_sq))) / (self.m + n) -
                          np.square(new_means))
-            self.vars = np.maximum(0.0, self.vars)
+            self.vars = np.maximum(0.0, self.vars)  # occasionally goes negative, clip
             self.means = new_means
             self.m += n
 
