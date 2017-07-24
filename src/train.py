@@ -22,7 +22,7 @@ implementation:
 https://github.com/joschu/modular_rl
 
 This implementation learns policies for continuous environments
-in the OpenAI Gym (https://gym.openai.com/). Testing focused on
+in the OpenAI Gym (https://gym.openai.com/). Testing was focused on
 the MuJoCo control tasks.
 """
 import gym
@@ -98,7 +98,7 @@ def run_episode(env, policy, scaler, animate=False):
         obs = obs.astype(np.float64).reshape((1, -1))
         obs = np.append(obs, [[step]], axis=1)  # add time step feature
         unscaled_obs.append(obs)
-        obs = (obs - offset) * scale  # scale and offset observations
+        obs = (obs - offset) * scale  # center and scale observations
         observes.append(obs)
         action = policy.sample(obs).reshape((1, -1)).astype(np.float64)
         actions.append(action)
