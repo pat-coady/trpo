@@ -35,6 +35,18 @@ from utils import Logger, Scaler
 from datetime import datetime
 import os
 import argparse
+import signal
+
+
+class GracefulKiller:
+    """ Gracefully exit program on CTRL-C """
+    def __init__(self):
+        self.kill_now = False
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+
+    def exit_gracefully(self, signum, frame):
+        self.kill_now = True
 
 
 def init_gym(env_name):
@@ -248,15 +260,17 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode
                 })
 
 
-def main(env_name, max_episodes, gamma, lam):
+def main(env_name, num_episodes, gamma, lam, kl_targ):
     """ Main training loop
 
     Args:
         env_name: OpenAI Gym environment name, e.g. 'Hopper-v1'
-        max_episodes: maximum number of episodes to run
+        num_episodes: maximum number of episodes to run
         gamma: reward discount factor (float)
         lam: lambda from Generalized Advantage Estimate
+        kl_targ: D_KL target for policy update [D_KL(pi_old || pi_new)
     """
+    killer = GracefulKiller()
     env, obs_dim, act_dim = init_gym(env_name)
     obs_dim += 1  # add 1 to obs dimension for time step feature (see run_episode())
     now = datetime.utcnow().strftime("%b-%d_%H:%M:%S")  # create unique directories
@@ -265,11 +279,11 @@ def main(env_name, max_episodes, gamma, lam):
     env = wrappers.Monitor(env, aigym_path, force=True)
     scaler = Scaler(obs_dim)
     val_func = NNValueFunction(obs_dim)
-    policy = Policy(obs_dim, act_dim)
+    policy = Policy(obs_dim, act_dim, kl_targ)
     # run a few episodes of untrained policy to initialize scaler:
     run_policy(env, policy, scaler, logger, episodes=5)
     episode = 0
-    while episode < max_episodes:
+    while episode < num_episodes:
         trajectories = run_policy(env, policy, scaler, logger, episodes=20)
         episode += len(trajectories)
         add_value(trajectories, val_func)  # add estimated values to episodes
@@ -282,18 +296,25 @@ def main(env_name, max_episodes, gamma, lam):
         policy.update(observes, actions, advantages, logger)  # update policy
         val_func.fit(observes, disc_sum_rew, logger)  # update value function
         logger.write(display=True)  # write logger results to file and stdout
+        if killer.kill_now:
+            if input('Terminate training (y/[n])? ') == 'y':
+                break
+            killer.kill_now = False
     logger.close()
     policy.close_sess()
     val_func.close_sess()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Train policy using Proximal Policy Optimizer')
-    parser.add_argument('-e', '--env_name', type=str, help='OpenAI Gym environment name')
-    parser.add_argument('-m', '--max_episodes', type=int, help='Maximum number of episodes to run',
+    parser = argparse.ArgumentParser(description=('Train policy on OpenAI Gym environment '
+                                                  'using Proximal Policy Optimizer'))
+    parser.add_argument('env_name', type=str, help='OpenAI Gym environment name')
+    parser.add_argument('-n', '--num_episodes', type=int, help='Number of episodes to run',
                         default=1000)
     parser.add_argument('-g', '--gamma', type=float, help='Discount factor', default=0.995)
     parser.add_argument('-l', '--lam', type=float, help='Lambda for Generalized Advantage Estimation',
                         default=0.98)
+    parser.add_argument('-k', '--kl_targ', type=float, help='D_KL target value',
+                        default=0.003)
     args = parser.parse_args()
     main(**vars(args))

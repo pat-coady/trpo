@@ -9,7 +9,7 @@ import tensorflow as tf
 
 class Policy(object):
     """ NN-based policy approximation """
-    def __init__(self, obs_dim, act_dim, kl_targ=0.003):
+    def __init__(self, obs_dim, act_dim, kl_targ):
         """
         Args:
             obs_dim: num observation dimensions (int)
@@ -59,8 +59,8 @@ class Policy(object):
          for each action dimension (i.e. variances not determined by NN).
         """
         # hidden layer sizes determined by obs_dim and act_dim (hid2 is geometric mean)
-        hid1_size = self.obs_dim * 16  # 16 chosen empirically on 'Hopper-v1'
-        hid3_size = self.act_dim * 16  # 16 chosen empirically on 'Hopper-v1'
+        hid1_size = self.obs_dim * 10  # 10 chosen empirically on 'Hopper-v1'
+        hid3_size = self.act_dim * 10  # 10 chosen empirically on 'Hopper-v1'
         hid2_size = int(np.sqrt(hid1_size * hid3_size))
         # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
         self.lr = 3e-5 * np.sqrt(96) / np.sqrt(hid2_size)
@@ -79,7 +79,7 @@ class Policy(object):
                                          stddev=np.sqrt(1 / hid3_size)), name="means")
         # logvar_speed is used to 'fool' gradient descent into making faster updates
         # to log-variances. heuristic sets logvar_speed based on network size.
-        logvar_speed = (10 * hid2_size) // 96
+        logvar_speed = (10 * hid3_size) // 48
         log_vars = tf.get_variable('logvars', (logvar_speed, self.act_dim), tf.float32,
                                    tf.constant_initializer(0.0))
         self.log_vars = tf.reduce_sum(log_vars, axis=0) - 1.0
@@ -167,7 +167,7 @@ class Policy(object):
                      self.act_ph: actions,
                      self.advantages_ph: advantages,
                      self.beta_ph: self.beta,
-                     self.eta_ph: 100}
+                     self.eta_ph: 50}
         old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
                                                       feed_dict)
         feed_dict[self.old_log_vars_ph] = old_log_vars_np
