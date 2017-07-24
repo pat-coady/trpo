@@ -117,12 +117,11 @@ def run_policy(env, policy, scaler, logger, episodes):
         'rewards' : NumPy array of (un-discounted) rewards from episode
         'unscaled_obs' : NumPy array of (un-discounted) rewards from episode
     """
-    total_steps, total_episodes = (0, 0)
+    total_steps = 0
     trajectories = []
     for e in range(episodes):
         observes, actions, rewards, unscaled_obs = run_episode(env, policy, scaler)
         total_steps += observes.shape[0]
-        total_episodes += 1
         trajectory = {'observes': observes,
                       'actions': actions,
                       'rewards': rewards,
