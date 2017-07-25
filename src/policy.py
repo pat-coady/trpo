@@ -183,6 +183,7 @@ class Policy(object):
             self.beta *= 1.5       # (factors chosen empirically)
         elif kl < self.kl_targ / 2:
             self.beta /= 1.5
+        self.beta = np.clip(self.beta, 1/30, 30)
 
         logger.log({'PolicyLoss': loss,
                     'PolicyEntropy': entropy,

@@ -260,7 +260,7 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode
                 })
 
 
-def main(env_name, num_episodes, gamma, lam, kl_targ):
+def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size):
     """ Main training loop
 
     Args:
@@ -269,6 +269,7 @@ def main(env_name, num_episodes, gamma, lam, kl_targ):
         gamma: reward discount factor (float)
         lam: lambda from Generalized Advantage Estimate
         kl_targ: D_KL target for policy update [D_KL(pi_old || pi_new)
+        batch_size: number of episodes per policy training batch
     """
     killer = GracefulKiller()
     env, obs_dim, act_dim = init_gym(env_name)
@@ -284,7 +285,7 @@ def main(env_name, num_episodes, gamma, lam, kl_targ):
     run_policy(env, policy, scaler, logger, episodes=5)
     episode = 0
     while episode < num_episodes:
-        trajectories = run_policy(env, policy, scaler, logger, episodes=20)
+        trajectories = run_policy(env, policy, scaler, logger, episodes=batch_size)
         episode += len(trajectories)
         add_value(trajectories, val_func)  # add estimated values to episodes
         add_disc_sum_rew(trajectories, gamma)  # calculated discounted sum of Rs
@@ -316,5 +317,9 @@ if __name__ == "__main__":
                         default=0.98)
     parser.add_argument('-k', '--kl_targ', type=float, help='D_KL target value',
                         default=0.003)
+    parser.add_argument('-b', '--batch_size', type=int,
+                        help='Number of episodes per training batch',
+                        default=20)
+
     args = parser.parse_args()
     main(**vars(args))
