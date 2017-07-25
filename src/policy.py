@@ -47,6 +47,8 @@ class Policy(object):
         # strength of D_KL loss terms:
         self.beta_ph = tf.placeholder(tf.float32, (), 'beta')
         self.eta_ph = tf.placeholder(tf.float32, (), 'eta')
+        # learning rate:
+        self.lr_ph = tf.placeholder(tf.float32, (), 'eta')
         # log_vars and means with pi_old (previous step's policy parameters):
         self.old_log_vars_ph = tf.placeholder(tf.float32, (self.act_dim,), 'old_log_vars')
         self.old_means_ph = tf.placeholder(tf.float32, (None, self.act_dim), 'old_means')
@@ -140,7 +142,7 @@ class Policy(object):
         loss2 = tf.reduce_mean(self.beta_ph * self.kl)
         loss3 = self.eta_ph * tf.square(tf.maximum(0.0, self.kl - 2.0 * self.kl_targ))
         self.loss = loss1 + loss2 + loss3
-        optimizer = tf.train.AdamOptimizer(self.lr)
+        optimizer = tf.train.AdamOptimizer(self.lr_ph)
         self.train_op = optimizer.minimize(self.loss)
 
     def _init_session(self):
@@ -167,7 +169,8 @@ class Policy(object):
                      self.act_ph: actions,
                      self.advantages_ph: advantages,
                      self.beta_ph: self.beta,
-                     self.eta_ph: 50}
+                     self.eta_ph: 50,
+                     self.lr_ph: self.lr}
         old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
                                                       feed_dict)
         feed_dict[self.old_log_vars_ph] = old_log_vars_np
@@ -179,16 +182,18 @@ class Policy(object):
             loss, kl, entropy = self.sess.run([self.loss, self.kl, self.entropy], feed_dict)
             if kl > self.kl_targ * 4:  # early stopping if D_KL diverges badly
                 break
-        if kl > self.kl_targ * 2:  # tune beta to reach D_KL target
-            self.beta *= 1.5       # (factors chosen empirically)
+        if kl > self.kl_targ * 2:  # servo beta to reach D_KL target
+            self.beta = np.minimum(35, 1.5 * self.beta)  # clip beta
+            if self.beta > 30:
+                self.lr = self.lr / 1.5  # KL (and beta) can "take off" when LR too high
         elif kl < self.kl_targ / 2:
-            self.beta /= 1.5
-        self.beta = np.clip(self.beta, 1/30, 30)
+            self.beta = np.maximum(1 / 35, self.beta / 1.5)  # clip beta
 
         logger.log({'PolicyLoss': loss,
                     'PolicyEntropy': entropy,
                     'KL': kl,
-                    'Beta': self.beta})
+                    'Beta': self.beta,
+                    '_lr': self.lr})
 
     def close_sess(self):
         """ Close TensorFlow session """

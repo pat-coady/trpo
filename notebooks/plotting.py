@@ -10,7 +10,7 @@ Written by Patrick Coady (pat-coady.github.io)
 import matplotlib.pyplot as plt
 
 
-def df_plot(dfs, x, ys, ylim=None, legend_loc='best'):
+def df_plot(dfs, x, ys, ylim=None, xlim=None, legend_loc='best'):
     """ Plot y vs. x curves from pandas dataframe(s)
 
     Args:
@@ -18,6 +18,7 @@ def df_plot(dfs, x, ys, ylim=None, legend_loc='best'):
         x: str column label for x variable
         ys: list of str column labels for y variable(s)
         ylim: tuple to override automatic y-axis limits
+        xlim: tuple to override automatic x-axis limits
         legend_loc: str to override automatic legend placement:
             'upper left', 'lower left', 'lower right' , 'right' ,
             'center left', 'center right', 'lower center',
@@ -25,6 +26,8 @@ def df_plot(dfs, x, ys, ylim=None, legend_loc='best'):
     """
     if ylim is not None:
         plt.ylim(ylim)
+    if xlim is not None:
+        plt.xlim(xlim)
     for df, name in dfs:
         if '_' in name:
             name = name.split('_')[1]
