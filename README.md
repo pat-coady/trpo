@@ -24,7 +24,7 @@ Here are the key points:
     * 50 episodes for Reacher
     * 5 episodes for Swimmer
     * 5 episodes for HalfCheetah
-    * 5 episodes for Ant
+
     * 5 episodes for HumanoidStandup
 * Value function is trained on current batch + previous batch
 * KL loss factor and ADAM learning rate are dynamically adjusted during training
@@ -32,11 +32,11 @@ Here are the key points:
 
 ## Dependencies
 
-Python 3.5
-The Usual Suspects: NumPy, matplotlib, scipy
-TensorFlow
-gym - [installation instructions](https://gym.openai.com/docs)
-[MuJoCo](http://www.mujoco.org/) (30-day trial available and free to students)
+* Python 3.5
+* The Usual Suspects: NumPy, matplotlib, scipy
+* TensorFlow
+* gym - [installation instructions](https://gym.openai.com/docs)
+* [MuJoCo](http://www.mujoco.org/) (30-day trial available and free to students)
 
 ### Results can be reproduced as follows:
 
