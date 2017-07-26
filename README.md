@@ -1,20 +1,12 @@
-## Proximal Policy Optimization: Ant-v1
-
-**UNDER CONSTRUCTION -- busy running last couple OpenAI Gym MuJoCo environments**
+## Proximal Policy Optimization with Generalized Advantage Estimation
 
 By Patrick Coady: [Learning Artificial Intelligence](https://pat-coady.github.io/)
 
-## Key Dependencies
+### Summary
 
-Python 3.5+
-MuJoCo
-gym
-TensorFlow
+The same learning algorithm was used to train agents for each of the ten OpenAI Gym MuJoCo continuous control environments. The only difference between evaluations was the number of episodes used per training batch, otherwise all options were the same. The exact code used to generate the OpenAI Gym submissions is in the **`aigym_evaluation`** branch.
 
-
-## Summary
-
-The same learning algorithm was used to train agents for each of the ten OpenAI Gym MuJoCo continuous control environments. The only difference between evaluations was the number of episodes used for training, otherwise all options were the same. The exact code used to generate the submissions is in the **`aigym_evaluation`** branch. The code was written to be understandable and easily modifiable.
+The README.md file in the GitHub repository provides additional details on the algorithm and usage instructions.
 
 Here are the key points:
 
@@ -27,12 +19,40 @@ Here are the key points:
     * hid1 size = obs_dim x 10
     * hid2 size = geometric mean of hid1 and hid3 sizes
     * hid3 size = action_dim x 10
-    * Diagonal covariance matrix variables are separate from the NN
+    * Diagonal covariance matrix variables are separately trained
 * Generalized Advantage Estimation (gamma = 0.995, lambda = 0.98) \[3\] \[4\]
 * ADAM optimizer used for both neural networks
-* Policy is evaluated for 20 episodes, and then updated
+* The policy is evaluated for 20 episodes between updates, except:
+    * 50 episodes for Reacher
+    * 5 episodes for Swimmer
+    * 5 episodes for HalfCheetah
+    * 5 episodes for Ant
+    * 5 episodes for HumanoidStandup
 * Value function is trained on current batch + previous batch
+* KL loss factor and ADAM learning rate are dynamically adjusted during training
 * Policy and Value NNs built with TensorFlow
+
+## Key Dependencies
+
+Python 3.5+
+[MuJoCo](http://www.mujoco.org/) (30-day trial available and free to students)
+gym
+TensorFlow
+
+### Results can be reproduced as follows:
+
+```
+./train.py Reacher-v1 -n 50000 -b 50
+./train.py InvertedPendulum-v1
+./train.py InvertedDoublePendulum-v1 -n 12000
+./train.py Swimmer-v1 -n 1500 -b 5
+./train.py Hopper-v1 -n 15000
+./train.py HalfCheetah-v1 -n 3000 -b 5
+./train.py Walker2d-v1 -n 25000
+./train.py Ant-v1 -n 50000 -b 5
+./train.py Humanoid-v1 -n 100000
+./train.py HumanoidStandup-v1 -n 100000 -b 5
+```
 
 ### References
 
