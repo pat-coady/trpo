@@ -24,7 +24,6 @@ Here are the key points:
     * 50 episodes for Reacher
     * 5 episodes for Swimmer
     * 5 episodes for HalfCheetah
-
     * 5 episodes for HumanoidStandup
 * Value function is trained on current batch + previous batch
 * KL loss factor and ADAM learning rate are dynamically adjusted during training
@@ -48,7 +47,7 @@ Here are the key points:
 ./train.py Hopper-v1 -n 15000
 ./train.py HalfCheetah-v1 -n 3000 -b 5
 ./train.py Walker2d-v1 -n 25000
-./train.py Ant-v1 -n 50000 -b 5
+./train.py Ant-v1 -n 100000
 ./train.py Humanoid-v1 -n 100000
 ./train.py HumanoidStandup-v1 -n 100000 -b 5
 ```
