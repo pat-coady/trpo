@@ -6,8 +6,6 @@ By Patrick Coady: [Learning Artificial Intelligence](https://pat-coady.github.io
 
 The same learning algorithm was used to train agents for each of the ten OpenAI Gym MuJoCo continuous control environments. The only difference between evaluations was the number of episodes used per training batch, otherwise all options were the same. The exact code used to generate the OpenAI Gym submissions is in the **`aigym_evaluation`** branch.
 
-The README.md file in the GitHub repository provides additional details on the algorithm and usage instructions.
-
 Here are the key points:
 
 * Proximal Policy Optimization (similar to TRPO, but uses gradient descent with KL loss terms)  \[1\] \[2\]
@@ -32,12 +30,13 @@ Here are the key points:
 * KL loss factor and ADAM learning rate are dynamically adjusted during training
 * Policy and Value NNs built with TensorFlow
 
-## Key Dependencies
+## Dependencies
 
-Python 3.5+
-[MuJoCo](http://www.mujoco.org/) (30-day trial available and free to students)
-gym
+Python 3.5
+The Usual Suspects: NumPy, matplotlib, scipy
 TensorFlow
+gym - [installation instructions](https://gym.openai.com/docs)
+[MuJoCo](http://www.mujoco.org/) (30-day trial available and free to students)
 
 ### Results can be reproduced as follows:
 
