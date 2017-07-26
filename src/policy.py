@@ -16,11 +16,12 @@ class Policy(object):
             act_dim: num action dimensions (int)
             kl_targ: target KL divergence between pi_old and pi_new
         """
-        self.beta = 1.0  # initial value for beta: D_KL loss multiplier
-        self.eta = 100  # multiplier for D_KL-kl_targ hinge-squared loss
+        self.beta = 1.0  # dynamically adjusted D_KL loss multiplier
+        self.eta = 50  # multiplier for D_KL-kl_targ hinge-squared loss
         self.kl_targ = kl_targ
         self.epochs = 20
         self.lr = None
+        self.lr_multiplier = 1.0  # dynamically adjust lr when D_KL out of control
         self.obs_dim = obs_dim
         self.act_dim = act_dim
         self._build_graph()
@@ -169,8 +170,8 @@ class Policy(object):
                      self.act_ph: actions,
                      self.advantages_ph: advantages,
                      self.beta_ph: self.beta,
-                     self.eta_ph: 50,
-                     self.lr_ph: self.lr}
+                     self.eta_ph: self.eta,
+                     self.lr_ph: self.lr * self.lr_multiplier}
         old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
                                                       feed_dict)
         feed_dict[self.old_log_vars_ph] = old_log_vars_np
@@ -183,17 +184,19 @@ class Policy(object):
             if kl > self.kl_targ * 4:  # early stopping if D_KL diverges badly
                 break
         if kl > self.kl_targ * 2:  # servo beta to reach D_KL target
-            self.beta = np.minimum(35, 1.5 * self.beta)  # clip beta
-            if self.beta > 30:
-                self.lr = self.lr / 1.5  # KL (and beta) can "take off" when LR too high
+            self.beta = np.minimum(35, 1.5 * self.beta)  # max clip beta
+            if self.beta > 30 and self.lr_multiplier > 0.1:
+                self.lr_multiplier /= 1.5
         elif kl < self.kl_targ / 2:
-            self.beta = np.maximum(1 / 35, self.beta / 1.5)  # clip beta
+            self.beta = np.maximum(1 / 35, self.beta / 1.5)  # min clip beta
+            if self.beta < (1 / 30) and self.lr_multiplier < 10:
+                self.lr_multiplier *= 1.5
 
         logger.log({'PolicyLoss': loss,
                     'PolicyEntropy': entropy,
                     'KL': kl,
                     'Beta': self.beta,
-                    '_lr': self.lr})
+                    '_lr_multiplier': self.lr_multiplier})
 
     def close_sess(self):
         """ Close TensorFlow session """
