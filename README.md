@@ -40,16 +40,16 @@ Here are the key points:
 ### Results can be reproduced as follows:
 
 ```
-./train.py Reacher-v1 -n 50000 -b 50
+./train.py Reacher-v1 -n 60000 -b 50
 ./train.py InvertedPendulum-v1
 ./train.py InvertedDoublePendulum-v1 -n 12000
-./train.py Swimmer-v1 -n 1500 -b 5
-./train.py Hopper-v1 -n 15000
+./train.py Swimmer-v1 -n 2500 -b 5
+./train.py Hopper-v1 -n 20000
 ./train.py HalfCheetah-v1 -n 3000 -b 5
 ./train.py Walker2d-v1 -n 25000
 ./train.py Ant-v1 -n 100000
-./train.py Humanoid-v1 -n 100000
-./train.py HumanoidStandup-v1 -n 100000 -b 5
+./train.py Humanoid-v1 -n 200000
+./train.py HumanoidStandup-v1 -n 200000 -b 5
 ```
 
 ### References
