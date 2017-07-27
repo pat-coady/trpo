@@ -1,2 +1,12 @@
 # logs and checkpoints
 .idea/
+*.log
+notebooks/__pycache__/
+notebooks/.ipynb_checkpoints/
+src/__pycache__/
+src/log-files/
+src/.ipynb_checkpoints/
+
+# generated files
+exportToHTML/
+
