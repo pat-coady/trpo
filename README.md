@@ -44,7 +44,7 @@ Here are the key points:
 ./train.py InvertedPendulum-v1
 ./train.py InvertedDoublePendulum-v1 -n 12000
 ./train.py Swimmer-v1 -n 2500 -b 5
-./train.py Hopper-v1 -n 20000
+./train.py Hopper-v1 -n 30000
 ./train.py HalfCheetah-v1 -n 3000 -b 5
 ./train.py Walker2d-v1 -n 25000
 ./train.py Ant-v1 -n 100000
