@@ -6,6 +6,7 @@ notebooks/.ipynb_checkpoints/
 src/__pycache__/
 src/log-files/
 src/.ipynb_checkpoints/
+tmp/
 
 # generated files
 exportToHTML/
