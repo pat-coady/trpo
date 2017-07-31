@@ -111,6 +111,9 @@ class Policy(object):
         Add to Graph:
             1. KL divergence between old and new distributions
             2. Entropy of present policy given states and actions
+
+        https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Kullback.E2.80.93Leibler_divergence
+        https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Entropy
         """
         log_det_cov_old = tf.reduce_sum(self.old_log_vars_ph)
         log_det_cov_new = tf.reduce_sum(self.log_vars)
