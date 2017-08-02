@@ -31,7 +31,7 @@ class NNValueFunction(object):
         with self.g.as_default():
             self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
             self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
-            # hid1 layer size is 16x obs_dim, hid3 size is 10, and hid2 is geometric mean
+            # hid1 layer size is 10x obs_dim, hid3 size is 10, and hid2 is geometric mean
             hid1_size = self.obs_dim * 10  # 10 chosen empirically on 'Hopper-v1'
             hid3_size = 5  # 5 chosen empirically on 'Hopper-v1'
             hid2_size = int(np.sqrt(hid1_size * hid3_size))
@@ -53,7 +53,7 @@ class NNValueFunction(object):
                                   kernel_initializer=tf.random_normal_initializer(
                                       stddev=np.sqrt(1 / hid3_size)), name='output')
             self.out = tf.squeeze(out)
-            self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))  # sqared loss
+            self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))  # squared loss
             optimizer = tf.train.AdamOptimizer(self.lr)
             self.train_op = optimizer.minimize(self.loss)
             self.init = tf.global_variables_initializer()
