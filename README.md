@@ -1,6 +1,6 @@
 ## Proximal Policy Optimization with Generalized Advantage Estimation
 
-By Patrick Coady: [Learning Artificial Intelligence](https://pat-coady.github.io/)
+By Patrick Coady: [Learning Artificial Intelligence](http://learningai.io/)
 
 ### Summary
 
