@@ -95,14 +95,14 @@ def run_episode(env, policy, scaler, animate=False):
     while not done:
         if animate:
             env.render()
-        obs = obs.astype(np.float64).reshape((1, -1))
+        obs = obs.astype(np.float32).reshape((1, -1))
         obs = np.append(obs, [[step]], axis=1)  # add time step feature
         unscaled_obs.append(obs)
         obs = (obs - offset) * scale  # center and scale observations
         observes.append(obs)
-        action = policy.sample(obs).reshape((1, -1)).astype(np.float64)
+        action = policy.sample(obs).reshape((1, -1)).astype(np.float32)
         actions.append(action)
-        obs, reward, done, _ = env.step(np.squeeze(action))
+        obs, reward, done, _ = env.step(np.squeeze(action, axis=0))
         if not isinstance(reward, float):
             reward = np.asscalar(reward)
         rewards.append(reward)
