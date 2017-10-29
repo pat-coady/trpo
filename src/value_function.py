@@ -11,14 +11,16 @@ from sklearn.utils import shuffle
 
 class NNValueFunction(object):
     """ NN-based state-value function """
-    def __init__(self, obs_dim):
+    def __init__(self, obs_dim, hid1_mult):
         """
         Args:
             obs_dim: number of dimensions in observation vector (int)
+            hid1_mult: size of first hidden layer, multiplier of obs_dim
         """
         self.replay_buffer_x = None
         self.replay_buffer_y = None
         self.obs_dim = obs_dim
+        self.hid1_mult = hid1_mult
         self.epochs = 10
         self.lr = None  # learning rate set in _build_graph()
         self._build_graph()
@@ -32,7 +34,7 @@ class NNValueFunction(object):
             self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
             self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
             # hid1 layer size is 10x obs_dim, hid3 size is 10, and hid2 is geometric mean
-            hid1_size = self.obs_dim * 10  # 10 chosen empirically on 'Hopper-v1'
+            hid1_size = self.obs_dim * self.hid1_mult  # default multipler 10 chosen empirically on 'Hopper-v1'
             hid3_size = 5  # 5 chosen empirically on 'Hopper-v1'
             hid2_size = int(np.sqrt(hid1_size * hid3_size))
             # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')

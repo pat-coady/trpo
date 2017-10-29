@@ -9,16 +9,20 @@ import tensorflow as tf
 
 class Policy(object):
     """ NN-based policy approximation """
-    def __init__(self, obs_dim, act_dim, kl_targ):
+    def __init__(self, obs_dim, act_dim, kl_targ, hid1_mult, policy_logvar):
         """
         Args:
             obs_dim: num observation dimensions (int)
             act_dim: num action dimensions (int)
             kl_targ: target KL divergence between pi_old and pi_new
+            hid1_mult: size of first hidden layer, multiplier of obs_dim
+            policy_logvar: natural log of initial policy variance
         """
         self.beta = 1.0  # dynamically adjusted D_KL loss multiplier
         self.eta = 50  # multiplier for D_KL-kl_targ hinge-squared loss
         self.kl_targ = kl_targ
+        self.hid1_mult = hid1_mult
+        self.policy_logvar = policy_logvar
         self.epochs = 20
         self.lr = None
         self.lr_multiplier = 1.0  # dynamically adjust lr when D_KL out of control
@@ -62,7 +66,7 @@ class Policy(object):
          for each action dimension (i.e. variances not determined by NN).
         """
         # hidden layer sizes determined by obs_dim and act_dim (hid2 is geometric mean)
-        hid1_size = self.obs_dim * 10  # 10 empirically determined
+        hid1_size = self.obs_dim * self.hid1_mult  # 10 empirically determined
         hid3_size = self.act_dim * 10  # 10 empirically determined
         hid2_size = int(np.sqrt(hid1_size * hid3_size))
         # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
@@ -85,7 +89,7 @@ class Policy(object):
         logvar_speed = (10 * hid3_size) // 48
         log_vars = tf.get_variable('logvars', (logvar_speed, self.act_dim), tf.float32,
                                    tf.constant_initializer(0.0))
-        self.log_vars = tf.reduce_sum(log_vars, axis=0) - 1.0
+        self.log_vars = tf.reduce_sum(log_vars, axis=0) + self.policy_logvar
 
         print('Policy Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}, logvar_speed: {}'
               .format(hid1_size, hid2_size, hid3_size, self.lr, logvar_speed))
