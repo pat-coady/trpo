@@ -52,6 +52,10 @@ Here are the key points:
 ./train.py HumanoidStandup-v1 -n 200000 -b 5
 ```
 
+### View the videos
+
+During training, videos are periodically saved automatically to the /tmp folder. These can be enjoyable, and also instructive.
+
 ### References
 
 1. [Trust Region Policy Optimization](https://arxiv.org/pdf/1502.05477.pdf) (Schulman et al., 2016)
