@@ -56,6 +56,13 @@ Here are the key points:
 
 During training, videos are periodically saved automatically to the /tmp folder. These can be enjoyable, and also instructive.
 
+### Reuse the saved trained models
+
+Example usage after running the updated 'train.py' that trains and saves the learned model:
+```
+python reload.py HalfCheetah-v1 
+```
+
 ### References
 
 1. [Trust Region Policy Optimization](https://arxiv.org/pdf/1502.05477.pdf) (Schulman et al., 2016)
