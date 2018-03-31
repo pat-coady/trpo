@@ -261,7 +261,7 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode
                 })
 
 
-def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, policy_logvar):
+def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, policy_logvar, clipping_range):
     """ Main training loop
 
     Args:
@@ -283,7 +283,7 @@ def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, pol
     #env = wrappers.Monitor(env, aigym_path, force=True)
     scaler = Scaler(obs_dim)
     val_func = NNValueFunction(obs_dim, hid1_mult)
-    policy = Policy(env_name, obs_dim, act_dim, kl_targ, hid1_mult, policy_logvar)
+    policy = Policy(env_name, obs_dim, act_dim, kl_targ, hid1_mult, policy_logvar, clipping_range)
     # run a few episodes of untrained policy to initialize scaler:
     run_policy(env, policy, scaler, logger, episodes=5)
     episode = 0
@@ -340,6 +340,10 @@ if __name__ == "__main__":
     parser.add_argument('-v', '--policy_logvar', type=float,
                         help='Initial policy log-variance (natural log of variance)',
                         default=-1.0)
+    parser.add_argument('-c', '--clipping_range',
+                        nargs=2, type=float,
+                        help='Use clipping range objective in PPO instead of KL divergence penalty',
+                        default=None)
 
     args = parser.parse_args()
     main(**vars(args))
