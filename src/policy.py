@@ -9,7 +9,7 @@ import tensorflow as tf, os
 
 class Policy(object):
     """ NN-based policy approximation """
-    def __init__(self, env_name, obs_dim, act_dim, kl_targ, hid1_mult, policy_logvar, clipping_range=None):
+    def __init__(self, env_name, obs_dim, act_dim, kl_targ, hid1_mult, policy_logvar):
         """
         Args:
             obs_dim: num observation dimensions (int)
@@ -29,7 +29,6 @@ class Policy(object):
         self.lr_multiplier = 1.0  # dynamically adjust lr when D_KL out of control
         self.obs_dim = obs_dim
         self.act_dim = act_dim
-        self.clipping_range = clipping_range
         self._build_graph()
         self._init_session()
 
@@ -151,20 +150,11 @@ class Policy(object):
 
         See: https://arxiv.org/pdf/1707.02286.pdf
         """
-        if self.clipping_range is not None:
-            print('setting up loss with clipping objective')
-            pg_ratio = tf.exp(self.logp - self.logp_old)
-            clipped_pg_ratio = tf.clip_by_value(pg_ratio, 1 - self.clipping_range[0], 1 + self.clipping_range[1])
-            surrogate_loss = tf.minimum(self.advantages_ph * pg_ratio,
-                                        self.advantages_ph * clipped_pg_ratio)
-            self.loss = -tf.reduce_mean(surrogate_loss)
-        else:
-            print('setting up loss with KL penalty')
-            loss1 = -tf.reduce_mean(self.advantages_ph *
-                                    tf.exp(self.logp - self.logp_old))
-            loss2 = tf.reduce_mean(self.beta_ph * self.kl)
-            loss3 = self.eta_ph * tf.square(tf.maximum(0.0, self.kl - 2.0 * self.kl_targ))
-            self.loss = loss1 + loss2 + loss3
+        loss1 = -tf.reduce_mean(self.advantages_ph *
+                                tf.exp(self.logp - self.logp_old))
+        loss2 = tf.reduce_mean(self.beta_ph * self.kl)
+        loss3 = self.eta_ph * tf.square(tf.maximum(0.0, self.kl - 2.0 * self.kl_targ))
+        self.loss = loss1 + loss2 + loss3
         optimizer = tf.train.AdamOptimizer(self.lr_ph)
         self.train_op = optimizer.minimize(self.loss)
 
