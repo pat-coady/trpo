@@ -1,3 +1,4 @@
+#! /usr/bin/env python3
 """
 Reload and reuse the trained PPO/TRPO policies
 
