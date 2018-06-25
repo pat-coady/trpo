@@ -46,7 +46,7 @@ class Policy(object):
             self.init = tf.global_variables_initializer()
 
     def _saver_object(self):
-        self.saver = tf.train.Saver(max_to_keep=10, keep_checkpoint_every_n_hours=2)
+        self.saver = tf.train.Saver(max_to_keep=3, keep_checkpoint_every_n_hours=2)
 
     def _placeholders(self):
         """ Input placeholders"""
@@ -212,7 +212,7 @@ class Policy(object):
                     '_lr_multiplier': self.lr_multiplier})
 
     def close_sess(self):
-        """ Close TensorFlow session """
+        """ Save and close the tensorflow session """
         model_directory = './saved_models/' + self.env_name + '/'
         if not os.path.exists(model_directory):
             os.makedirs(model_directory)
