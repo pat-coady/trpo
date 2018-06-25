@@ -307,7 +307,7 @@ def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, pol
 
     scale, offset = scaler.get()
     data = {'SCALE': scale, 'OFFSET': offset}
-    directory_to_store_data = './saved_models/' + env_name + '/'
+    directory_to_store_data = '../saved_models/' + env_name + '/'
     if not os.path.exists(directory_to_store_data):
         os.makedirs(directory_to_store_data)
     file_name = directory_to_store_data + 'scale_and_offset.pkl'

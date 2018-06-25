@@ -21,7 +21,7 @@ def get_scale_and_offset(env_name: str):
 
     Returns: The scale and the offset values
     """
-    file_name = './saved_models/' + env_name + '/scale_and_offset.pkl'
+    file_name = '../saved_models/' + env_name + '/scale_and_offset.pkl'
     with open(file_name, 'rb') as f:
         data = pickle.load(f)
     return data['SCALE'], data['OFFSET']
@@ -34,7 +34,7 @@ def reload_and_run(env_name: str):
     Parameters:
         env_name (string):  Name of the environment to load and run
     """
-    directory_to_load_from = './saved_models/' + env_name + '/'
+    directory_to_load_from = '../saved_models/' + env_name + '/'
     if not os.path.exists(directory_to_load_from):
         print('Trained model for ' + env_name + ' doesn\'t exist. Run train.py first. Program is exiting now...')
         exit(0)

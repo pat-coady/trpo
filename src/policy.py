@@ -223,7 +223,7 @@ class Policy(object):
 
     def close_sess(self):
         """ Save and close the tensorflow session """
-        model_directory = './saved_models/' + self.env_name + '/'
+        model_directory = '../saved_models/' + self.env_name + '/'
         if not os.path.exists(model_directory):
             os.makedirs(model_directory)
         with self.g.as_default():
