@@ -4,12 +4,12 @@ NN Policy with KL Divergence Constraint (PPO / TRPO)
 Written by Patrick Coady (pat-coady.github.io)
 """
 import numpy as np
-import tensorflow as tf
+import tensorflow as tf, os
 
 
 class Policy(object):
     """ NN-based policy approximation """
-    def __init__(self, obs_dim, act_dim, kl_targ, hid1_mult, policy_logvar, clipping_range=None):
+    def __init__(self, env_name, obs_dim, act_dim, kl_targ, hid1_mult, policy_logvar, clipping_range=None):
         """
         Args:
             obs_dim: num observation dimensions (int)
@@ -18,6 +18,7 @@ class Policy(object):
             hid1_mult: size of first hidden layer, multiplier of obs_dim
             policy_logvar: natural log of initial policy variance
         """
+        self.env_name = env_name
         self.beta = 1.0  # dynamically adjusted D_KL loss multiplier
         self.eta = 50  # multiplier for D_KL-kl_targ hinge-squared loss
         self.kl_targ = kl_targ
@@ -42,7 +43,11 @@ class Policy(object):
             self._kl_entropy()
             self._sample()
             self._loss_train_op()
+            self._saver_object()
             self.init = tf.global_variables_initializer()
+
+    def _saver_object(self):
+        self.saver = tf.train.Saver(max_to_keep=3, keep_checkpoint_every_n_hours=2)
 
     def _placeholders(self):
         """ Input placeholders"""
@@ -133,9 +138,9 @@ class Policy(object):
 
     def _sample(self):
         """ Sample from distribution, given observation """
-        self.sampled_act = (self.means +
+        self.sampled_act = tf.add(self.means,
                             tf.exp(self.log_vars / 2.0) *
-                            tf.random_normal(shape=(self.act_dim,)))
+                            tf.random_normal(shape=(self.act_dim,)), name='output_action')
 
     def _loss_train_op(self):
         """
@@ -217,5 +222,10 @@ class Policy(object):
                     '_lr_multiplier': self.lr_multiplier})
 
     def close_sess(self):
-        """ Close TensorFlow session """
+        """ Save and close the tensorflow session """
+        model_directory = '../saved_models/' + self.env_name + '/'
+        if not os.path.exists(model_directory):
+            os.makedirs(model_directory)
+        with self.g.as_default():
+            self.saver.save(self.sess, model_directory + 'final')
         self.sess.close()
