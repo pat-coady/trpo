@@ -2,6 +2,8 @@
 
 By Patrick Coady: [Learning Artificial Intelligence](https://learningai.io/)
 
+Model saving and restore added by: Sanjay Thakur
+
 ### Summary
 
 The same learning algorithm was used to train agents for each of the ten OpenAI Gym MuJoCo continuous control environments. The only difference between evaluations was the number of episodes used per training batch, otherwise all options were the same. The exact code used to generate the OpenAI Gym submissions is in the **`aigym_evaluation`** branch.
