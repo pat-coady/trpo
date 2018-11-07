@@ -104,7 +104,7 @@ def run_episode(env, policy, scaler, animate=False):
         actions.append(action)
         obs, reward, done, _ = env.step(np.squeeze(action, axis=0))
         if not isinstance(reward, float):
-            reward = np.asscalar(reward)
+            reward = np.asscalar(np.asarray(reward))
         rewards.append(reward)
         step += 1e-3  # increment time step feature
 
