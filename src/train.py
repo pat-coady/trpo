@@ -26,6 +26,8 @@ in the OpenAI Gym (https://gym.openai.com/). Testing was focused on
 the MuJoCo control tasks.
 """
 import gym
+import pybullet
+import pybullet_envs
 import numpy as np
 from gym import wrappers
 from policy import Policy
@@ -39,7 +41,7 @@ import signal
 
 
 class GracefulKiller:
-    """ Gracefully exit program on CTRL-C """
+    """Gracefully exit program on CTRL-C."""
     def __init__(self):
         self.kill_now = False
         signal.signal(signal.SIGINT, self.exit_gracefully)
@@ -70,7 +72,7 @@ def init_gym(env_name):
 
 
 def run_episode(env, policy, scaler, animate=False):
-    """ Run single episode with option to animate
+    """Run single episode with option to animate.
 
     Args:
         env: ai gym environment
@@ -270,7 +272,7 @@ def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, pol
         lam: lambda from Generalized Advantage Estimate
         kl_targ: D_KL target for policy update [D_KL(pi_old || pi_new)
         batch_size: number of episodes per policy training batch
-        hid1_mult: hid1 size for policy and value_f (mutliplier of obs dimension)
+        hid1_mult: hid1 size for policy and value_f (multiplier of obs dimension)
         policy_logvar: natural log of initial policy variance
     """
     killer = GracefulKiller()
@@ -311,7 +313,7 @@ def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, pol
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=('Train policy on OpenAI Gym environment '
                                                   'using Proximal Policy Optimizer'))
-    parser.add_argument('env_name', type=str, help='OpenAI Gym environment name')
+    parser.add_argument('env_name', type=str, help='OpenAI Gym (PyBullet) environment name')
     parser.add_argument('-n', '--num_episodes', type=int, help='Number of episodes to run',
                         default=1000)
     parser.add_argument('-g', '--gamma', type=float, help='Discount factor', default=0.995)

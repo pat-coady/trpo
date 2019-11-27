@@ -3,8 +3,10 @@ State-Value Function
 
 Written by Patrick Coady (pat-coady.github.io)
 """
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.optimizers import Adam
 
-import tensorflow as tf
 import numpy as np
 from sklearn.utils import shuffle
 
@@ -22,45 +24,29 @@ class NNValueFunction(object):
         self.obs_dim = obs_dim
         self.hid1_mult = hid1_mult
         self.epochs = 10
-        self.lr = None  # learning rate set in _build_graph()
-        self._build_graph()
-        self.sess = tf.Session(graph=self.g)
-        self.sess.run(self.init)
+        self.lr = None  # learning rate set in _build_model()
+        self.model = self._build_model()
 
-    def _build_graph(self):
+    def _build_model(self):
         """ Construct TensorFlow graph, including loss function, init op and train op """
-        self.g = tf.Graph()
-        with self.g.as_default():
-            self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs_valfunc')
-            self.val_ph = tf.placeholder(tf.float32, (None,), 'val_valfunc')
-            # hid1 layer size is 10x obs_dim, hid3 size is 10, and hid2 is geometric mean
-            hid1_size = self.obs_dim * self.hid1_mult  # default multipler 10 chosen empirically on 'Hopper-v1'
-            hid3_size = 5  # 5 chosen empirically on 'Hopper-v1'
-            hid2_size = int(np.sqrt(hid1_size * hid3_size))
-            # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
-            self.lr = 1e-2 / np.sqrt(hid2_size)  # 1e-3 empirically determined
-            print('Value Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}'
-                  .format(hid1_size, hid2_size, hid3_size, self.lr))
-            # 3 hidden layers with tanh activations
-            out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
-                                  kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / self.obs_dim)), name="h1")
-            out = tf.layers.dense(out, hid2_size, tf.tanh,
-                                  kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / hid1_size)), name="h2")
-            out = tf.layers.dense(out, hid3_size, tf.tanh,
-                                  kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / hid2_size)), name="h3")
-            out = tf.layers.dense(out, 1,
-                                  kernel_initializer=tf.random_normal_initializer(
-                                      stddev=np.sqrt(1 / hid3_size)), name='output')
-            self.out = tf.squeeze(out)
-            self.loss = tf.reduce_mean(tf.square(self.out - self.val_ph))  # squared loss
-            optimizer = tf.train.AdamOptimizer(self.lr)
-            self.train_op = optimizer.minimize(self.loss)
-            self.init = tf.global_variables_initializer()
-        self.sess = tf.Session(graph=self.g)
-        self.sess.run(self.init)
+        obs = Input(shape=(self.obs_dim,), dtype='float32')
+        # hid1 layer size is 10x obs_dim, hid3 size is 10, and hid2 is geometric mean
+        hid1_units = self.obs_dim * self.hid1_mult
+        hid3_units = 5  # 5 chosen empirically on 'Hopper-v1'
+        hid2_units = int(np.sqrt(hid1_units * hid3_units))
+        # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
+        self.lr = 1e-2 / np.sqrt(hid2_units)  # 1e-3 empirically determined
+        print('Value Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}'
+              .format(hid1_units, hid2_units, hid3_units, self.lr))
+        y = Dense(hid1_units, activation='tanh')(obs)
+        y = Dense(hid2_units, activation='tanh')(y)
+        y = Dense(hid3_units, activation='tanh')(y)
+        y = Dense(1)(y)
+        model = Model(inputs=obs, outputs=y)
+        optimizer = Adam(self.lr)
+        model.compile(optimizer=optimizer, loss='mse')
+
+        return model
 
     def fit(self, x, y, logger):
         """ Fit model to current data batch + previous data batch
@@ -72,7 +58,7 @@ class NNValueFunction(object):
         """
         num_batches = max(x.shape[0] // 256, 1)
         batch_size = x.shape[0] // num_batches
-        y_hat = self.predict(x)  # check explained variance prior to update
+        y_hat = self.model.predict(x)  # check explained variance prior to update
         old_exp_var = 1 - np.var(y - y_hat)/np.var(y)
         if self.replay_buffer_x is None:
             x_train, y_train = x, y
@@ -86,10 +72,9 @@ class NNValueFunction(object):
             for j in range(num_batches):
                 start = j * batch_size
                 end = (j + 1) * batch_size
-                feed_dict = {self.obs_ph: x_train[start:end, :],
-                             self.val_ph: y_train[start:end]}
-                _, l = self.sess.run([self.train_op, self.loss], feed_dict=feed_dict)
-        y_hat = self.predict(x)
+                self.model.train_on_batch(x_train[start:end, :],
+                                          y_train[start:end, :])
+        y_hat = self.model.predict(x)
         loss = np.mean(np.square(y_hat - y))         # explained variance after update
         exp_var = 1 - np.var(y - y_hat) / np.var(y)  # diagnose over-fitting of val func
 
@@ -99,11 +84,4 @@ class NNValueFunction(object):
 
     def predict(self, x):
         """ Predict method """
-        feed_dict = {self.obs_ph: x}
-        y_hat = self.sess.run(self.out, feed_dict=feed_dict)
-
-        return np.squeeze(y_hat)
-
-    def close_sess(self):
-        """ Close TensorFlow session """
-        self.sess.close()
+        return self.model.predict(x)
