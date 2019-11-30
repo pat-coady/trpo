@@ -3,43 +3,63 @@ NN Policy with KL Divergence Constraint (PPO / TRPO)
 
 Written by Patrick Coady (pat-coady.github.io)
 """
-import tensorflow as tf
-import tensorflow.keras.backend as K
-from tensorflow.keras import Model
-from tensorflow.keras.layers import Input, Dense, Lambda
-from tensorflow.keras.optimizers import Adam
-
 import numpy as np
+import tensorflow as tf
 
 
 class Policy(object):
     """ NN-based policy approximation """
-    def __init__(self, obs_dim, act_dim, kl_targ, hid1_mult, init_logvar, clipping_range=None):
+    def __init__(self, obs_dim, act_dim, kl_targ, hid1_mult, policy_logvar, clipping_range=None):
         """
         Args:
             obs_dim: num observation dimensions (int)
             act_dim: num action dimensions (int)
             kl_targ: target KL divergence between pi_old and pi_new
             hid1_mult: size of first hidden layer, multiplier of obs_dim
-            init_logvar: natural log of initial policy variance
+            policy_logvar: natural log of initial policy variance
         """
         self.beta = 1.0  # dynamically adjusted D_KL loss multiplier
         self.eta = 50  # multiplier for D_KL-kl_targ hinge-squared loss
         self.kl_targ = kl_targ
         self.hid1_mult = hid1_mult
-        self.init_logvar = init_logvar
+        self.policy_logvar = policy_logvar
         self.epochs = 20
         self.lr = None
         self.lr_multiplier = 1.0  # dynamically adjust lr when D_KL out of control
         self.obs_dim = obs_dim
         self.act_dim = act_dim
         self.clipping_range = clipping_range
-        self.policy = self._build_policy_model()
-        self.logprob = self._build_logprob_model()
-        self.kl_entropy = self._build_kl_entropy_model()
-        self.train = self.__build_train_model()
+        self._build_graph()
+        self._init_session()
 
-    def _build_policy_model(self):
+    def _build_graph(self):
+        """ Build and initialize TensorFlow graph """
+        self.g = tf.Graph()
+        with self.g.as_default():
+            self._placeholders()
+            self._policy_nn()
+            self._logprob()
+            self._kl_entropy()
+            self._sample()
+            self._loss_train_op()
+            self.init = tf.global_variables_initializer()
+
+    def _placeholders(self):
+        """ Input placeholders"""
+        # observations, actions and advantages:
+        self.obs_ph = tf.placeholder(tf.float32, (None, self.obs_dim), 'obs')
+        self.act_ph = tf.placeholder(tf.float32, (None, self.act_dim), 'act')
+        self.advantages_ph = tf.placeholder(tf.float32, (None,), 'advantages')
+        # strength of D_KL loss terms:
+        self.beta_ph = tf.placeholder(tf.float32, (), 'beta')
+        self.eta_ph = tf.placeholder(tf.float32, (), 'eta')
+        # learning rate:
+        self.lr_ph = tf.placeholder(tf.float32, (), 'eta')
+        # log_vars and means with pi_old (previous step's policy parameters):
+        self.old_log_vars_ph = tf.placeholder(tf.float32, (self.act_dim,), 'old_log_vars')
+        self.old_means_ph = tf.placeholder(tf.float32, (None, self.act_dim), 'old_means')
+
+    def _policy_nn(self):
         """ Neural net for policy approximation function
 
         Policy parameterized by Gaussian means and variances. NN outputs mean
@@ -47,67 +67,77 @@ class Policy(object):
          for each action dimension (i.e. variances not determined by NN).
         """
         # hidden layer sizes determined by obs_dim and act_dim (hid2 is geometric mean)
-        hid1_units = self.obs_dim * self.hid1_mult
-        hid3_units = self.act_dim * 10  # 10 empirically determined
-        hid2_units = int(np.sqrt(hid1_units * hid3_units))
+        hid1_size = self.obs_dim * self.hid1_mult  # 10 empirically determined
+        hid3_size = self.act_dim * 10  # 10 empirically determined
+        hid2_size = int(np.sqrt(hid1_size * hid3_size))
         # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
-        self.lr = 9e-4 / np.sqrt(hid2_units)  # 9e-4 empirically determined
-        obs = Input(shape=(self.obs_dim,), dtype='float32')
-        y = Dense(hid1_units, activation='tanh')(obs)
-        y = Dense(hid2_units, activation='tanh')(y)
-        y = Dense(hid3_units, activation='tanh')(y)
-        act_means = Dense(self.act_dim)(y)
-        # logvar_speed increases learning rate for log-variances.
-        # heuristic sets logvar_speed based on network size.
-        logvar_speed = (10 * hid3_units) // 48
-        act_logvars = K.variable(np.zeros(size=(self.act_dim, logvar_speed)), dtype='float32')
-        act_logvars = K.sum(act_logvars, axis=-1) + self.init_logvar
-        act_means_dummy = 0 * act_means  # dummy graph connection for act_logvars
-        act_logvars = act_logvars + act_means_dummy
+        self.lr = 9e-4 / np.sqrt(hid2_size)  # 9e-4 empirically determined
+        # 3 hidden layers with tanh activations
+        out = tf.layers.dense(self.obs_ph, hid1_size, tf.tanh,
+                              kernel_initializer=tf.random_normal_initializer(
+                                  stddev=np.sqrt(1 / self.obs_dim)), name="h1")
+        out = tf.layers.dense(out, hid2_size, tf.tanh,
+                              kernel_initializer=tf.random_normal_initializer(
+                                  stddev=np.sqrt(1 / hid1_size)), name="h2")
+        out = tf.layers.dense(out, hid3_size, tf.tanh,
+                              kernel_initializer=tf.random_normal_initializer(
+                                  stddev=np.sqrt(1 / hid2_size)), name="h3")
+        self.means = tf.layers.dense(out, self.act_dim,
+                                     kernel_initializer=tf.random_normal_initializer(
+                                         stddev=np.sqrt(1 / hid3_size)), name="means")
+        # logvar_speed is used to 'fool' gradient descent into making faster updates
+        # to log-variances. heuristic sets logvar_speed based on network size.
+        logvar_speed = (10 * hid3_size) // 48
+        log_vars = tf.get_variable('logvars', (logvar_speed, self.act_dim), tf.float32,
+                                   tf.constant_initializer(0.0))
+        self.log_vars = tf.reduce_sum(log_vars, axis=0) + self.policy_logvar
+
         print('Policy Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}, logvar_speed: {}'
-              .format(hid1_units, hid2_units, hid3_units, self.lr, logvar_speed))
+              .format(hid1_size, hid2_size, hid3_size, self.lr, logvar_speed))
 
-        return Model(inputs=obs, outputs=[act_means, act_logvars])
+    def _logprob(self):
+        """ Calculate log probabilities of a batch of observations & actions
 
-    def _build_logprob_model(self):
-        """ Model calculates log probabilities of a batch of actions."""
-        actions = Input(shape=(self.act_dim,), dtype='float32')
-        act_means = Input(shape=(self.act_dim,), dtype='float32')
-        act_logvars = Input(shape=(self.act_dim,), dtype='float32')
-
-        logp = -0.5 * K.sum(act_logvars)
-        logp += -0.5 * K.sum(K.square(actions - act_means) / K.exp(act_logvars))
-
-        return Model(inputs=[actions, act_means, act_logvars], outputs=logp)
-
-    def _build_kl_entropy_model(self):
+        Calculates log probabilities using previous step's model parameters and
+        new parameters being trained.
         """
-        Model calculates:
+        logp = -0.5 * tf.reduce_sum(self.log_vars)
+        logp += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.means) /
+                                     tf.exp(self.log_vars), axis=1)
+        self.logp = logp
+
+        logp_old = -0.5 * tf.reduce_sum(self.old_log_vars_ph)
+        logp_old += -0.5 * tf.reduce_sum(tf.square(self.act_ph - self.old_means_ph) /
+                                         tf.exp(self.old_log_vars_ph), axis=1)
+        self.logp_old = logp_old
+
+    def _kl_entropy(self):
+        """
+        Add to Graph:
             1. KL divergence between old and new distributions
-            2. Entropy of present policy
+            2. Entropy of present policy given states and actions
 
         https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Kullback.E2.80.93Leibler_divergence
         https://en.wikipedia.org/wiki/Multivariate_normal_distribution#Entropy
         """
-        old_means = Input(shape=(self.act_dim,), dtype='float32')
-        old_logvars = Input(shape=(self.act_dim,), dtype='float32')
-        new_means = Input(shape=(self.act_dim,), dtype='float32')
-        new_logvars = Input(shape=(self.act_dim,), dtype='float32')
-        log_det_cov_old = K.sum(old_logvars)
-        log_det_cov_new = K.sum(new_logvars)
-        trace_old_new = tf.reduce_sum(tf.exp(old_logvars - new_logvars))
+        log_det_cov_old = tf.reduce_sum(self.old_log_vars_ph)
+        log_det_cov_new = tf.reduce_sum(self.log_vars)
+        tr_old_new = tf.reduce_sum(tf.exp(self.old_log_vars_ph - self.log_vars))
 
-        kl = 0.5 * tf.reduce_mean(log_det_cov_new - log_det_cov_old + trace_old_new +
-                                  K.sum(K.square(new_means - old_means) /
-                                        K.exp(new_logvars)) -
-                                  self.act_dim)
-        entropy = 0.5 * (self.act_dim * (np.log(2 * np.pi) + 1) +
-                         K.sum(new_logvars))
+        self.kl = 0.5 * tf.reduce_mean(log_det_cov_new - log_det_cov_old + tr_old_new +
+                                       tf.reduce_sum(tf.square(self.means - self.old_means_ph) /
+                                                     tf.exp(self.log_vars), axis=1) -
+                                       self.act_dim)
+        self.entropy = 0.5 * (self.act_dim * (np.log(2 * np.pi) + 1) +
+                              tf.reduce_sum(self.log_vars))
 
-        return Model(inputs=[old_means, old_logvars, new_means, new_logvars],
-                     outputs=[kl, entropy])
+    def _sample(self):
+        """ Sample from distribution, given observation """
+        self.sampled_act = (self.means +
+                            tf.exp(self.log_vars / 2.0) *
+                            tf.random_normal(shape=(self.act_dim,)))
 
-    def __build_train_model(self):
+    def _loss_train_op(self):
         """
         Three loss terms:
             1) standard policy gradient
@@ -116,51 +146,33 @@ class Policy(object):
 
         See: https://arxiv.org/pdf/1707.02286.pdf
         """
-        old_means = Input(shape=(self.act_dim,), dtype='float32')
-        old_logvars = Input(shape=(self.act_dim,), dtype='float32')
-        logp_old = Input(shape=(1,), dtype='float32')
-        observes = Input(shape=(self.obs_dim,), dtype='float32')
-        new_means, new_logvars = self.policy(observes)
-        actions = Input(shape=(self.act_dim,), dtype='float32')
-        logp_new = self.logprob([actions, new_means, new_logvars])
-        advantages = Input(shape=(1,), dtype='float32')
-        kl, entropy = self.kl_entropy([old_means, old_logvars,
-                                       new_means, new_logvars])
-
         if self.clipping_range is not None:
             print('setting up loss with clipping objective')
-            pg_ratio = K.exp(logp_new - logp_old)
-            clipped_pg_ratio = K.clip(pg_ratio, 1 - self.clipping_range[0],
-                                      1 + self.clipping_range[1])
-            surrogate_loss = K.minimum(advantages * pg_ratio,
-                                       advantages * clipped_pg_ratio)
-            loss = -tf.reduce_mean(surrogate_loss)
+            pg_ratio = tf.exp(self.logp - self.logp_old)
+            clipped_pg_ratio = tf.clip_by_value(pg_ratio, 1 - self.clipping_range[0], 1 + self.clipping_range[1])
+            surrogate_loss = tf.minimum(self.advantages_ph * pg_ratio,
+                                        self.advantages_ph * clipped_pg_ratio)
+            self.loss = -tf.reduce_mean(surrogate_loss)
         else:
             print('setting up loss with KL penalty')
-            beta = K.variable(self.beta, dtype='float32', name='beta')
-            eta = K.variable(self.beta, dtype='float32', name='eta')
-            loss1 = -tf.reduce_mean(advantages *
-                                    tf.exp(logp_new - logp_old))
-            loss2 = tf.reduce_mean(beta * kl)
-            loss3 = eta * tf.square(tf.maximum(0.0, kl - 2.0 * self.kl_targ))
-            loss = loss1 + loss2 + loss3
-        loss = Lambda(lambda x: x, name='loss')(loss)
-        kl = Lambda(lambda x: x, name='kl')(kl)
-        entropy = Lambda(lambda x: x, name='entropy')(entropy)
-        model = Model(inputs=[observes, actions, advantages,
-                              logp_old, old_means, old_logvars],
-                      outputs=[loss, kl, entropy])
-        optimizer = Adam(self.lr * self.lr_multiplier)
-        model.compile(optimizer=optimizer, loss={'loss': 'mae'})
+            loss1 = -tf.reduce_mean(self.advantages_ph *
+                                    tf.exp(self.logp - self.logp_old))
+            loss2 = tf.reduce_mean(self.beta_ph * self.kl)
+            loss3 = self.eta_ph * tf.square(tf.maximum(0.0, self.kl - 2.0 * self.kl_targ))
+            self.loss = loss1 + loss2 + loss3
+        optimizer = tf.train.AdamOptimizer(self.lr_ph)
+        self.train_op = optimizer.minimize(self.loss)
 
-        return model
+    def _init_session(self):
+        """Launch TensorFlow session and initialize variables"""
+        self.sess = tf.Session(graph=self.g)
+        self.sess.run(self.init)
 
     def sample(self, obs):
-        """Draw sample from policy."""
-        act_means, act_logvars = self.policy.predict(obs)
-        act_stddevs = np.exp(act_logvars.numpy() / 2)
+        """Draw sample from policy distribution"""
+        feed_dict = {self.obs_ph: obs}
 
-        return np.random.normal(act_means.numpy(), act_stddevs)
+        return self.sess.run(self.sampled_act, feed_dict=feed_dict)
 
     def update(self, observes, actions, advantages, logger):
         """ Update policy based on observations, actions and advantages
@@ -171,18 +183,21 @@ class Policy(object):
             advantages: advantages, shape = (N,)
             logger: Logger object, see utils.py
         """
-        K.set_value(self.train.optimizer.lr, self.lr * self.lr_multiplier)
-        K.set_value(self.train.beta, self.beta)
-        K.set_value(self.train.eta, self.eta)
-        old_means, old_logvars = self.policy.predict(observes)
-        old_logp = self.logprob.predict(actions, old_means, old_logvars)
+        feed_dict = {self.obs_ph: observes,
+                     self.act_ph: actions,
+                     self.advantages_ph: advantages,
+                     self.beta_ph: self.beta,
+                     self.eta_ph: self.eta,
+                     self.lr_ph: self.lr * self.lr_multiplier}
+        old_means_np, old_log_vars_np = self.sess.run([self.means, self.log_vars],
+                                                      feed_dict)
+        feed_dict[self.old_log_vars_ph] = old_log_vars_np
+        feed_dict[self.old_means_ph] = old_means_np
         loss, kl, entropy = 0, 0, 0
         for e in range(self.epochs):
             # TODO: need to improve data pipeline - re-feeding data every epoch
-            loss, kl, entropy = self.train([observes, actions, advantages,
-                                            old_logp, old_means, old_logvars])
-            kl = np.mean(kl)
-            entropy = np.mean(entropy)
+            self.sess.run(self.train_op, feed_dict)
+            loss, kl, entropy = self.sess.run([self.loss, self.kl, self.entropy], feed_dict)
             if kl > self.kl_targ * 4:  # early stopping if D_KL diverges badly
                 break
         # TODO: too many "magic numbers" in next 8 lines of code, need to clean up
@@ -200,3 +215,7 @@ class Policy(object):
                     'KL': kl,
                     'Beta': self.beta,
                     '_lr_multiplier': self.lr_multiplier})
+
+    def close_sess(self):
+        """ Close TensorFlow session """
+        self.sess.close()
