@@ -8,7 +8,6 @@ from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras.optimizers import Adam
 
 import numpy as np
-from sklearn.utils import shuffle
 
 
 class NNValueFunction(object):
@@ -67,13 +66,8 @@ class NNValueFunction(object):
             y_train = np.concatenate([y, self.replay_buffer_y])
         self.replay_buffer_x = x
         self.replay_buffer_y = y
-        for e in range(self.epochs):
-            x_train, y_train = shuffle(x_train, y_train)
-            for j in range(num_batches):
-                start = j * batch_size
-                end = (j + 1) * batch_size
-                self.model.train_on_batch(x_train[start:end, :],
-                                          y_train[start:end, :])
+        self.model.fit(x_train, y_train, epochs=self.epochs, batch_size=batch_size,
+                       shuffle=True)
         y_hat = self.model.predict(x)
         loss = np.mean(np.square(y_hat - y))         # explained variance after update
         exp_var = 1 - np.var(y - y_hat) / np.var(y)  # diagnose over-fitting of val func
