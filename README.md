@@ -2,7 +2,7 @@
 
 By Patrick Coady: [Learning Artificial Intelligence](https://learningai.io/)
 
-### NOTE: Refactor to TensorFlow 2.0 and PyBullet in progress. See `tf1_mujoco` for old version.
+### NOTE: Refactor to TensorFlow 2.0 and PyBullet in progress. See `tf1_mujoco` branch for old version.
 
 ### Summary
 
