@@ -120,12 +120,12 @@ class Policy(object):
         old_logvars = Input(shape=(self.act_dim,), dtype='float32')
         logp_old = Input(shape=(1,), dtype='float32')
         observes = Input(shape=(self.obs_dim,), dtype='float32')
-        new_means, new_logvars = self.policy(observes)
+        new_means, new_logvars = self.policy.predict(observes)
         actions = Input(shape=(self.act_dim,), dtype='float32')
-        logp_new = self.logprob([actions, new_means, new_logvars])
+        logp_new = self.logprob.predict([actions, new_means, new_logvars])
         advantages = Input(shape=(1,), dtype='float32')
-        kl, entropy = self.kl_entropy([old_means, old_logvars,
-                                       new_means, new_logvars])
+        kl, entropy = self.kl_entropy.predict([old_means, old_logvars,
+                                               new_means, new_logvars])
 
         if self.clipping_range is not None:
             print('setting up loss with clipping objective')
@@ -158,9 +158,9 @@ class Policy(object):
     def sample(self, obs):
         """Draw sample from policy."""
         act_means, act_logvars = self.policy.predict(obs)
-        act_stddevs = np.exp(act_logvars.numpy() / 2)
+        act_stddevs = np.exp(act_logvars / 2)
 
-        return np.random.normal(act_means.numpy(), act_stddevs)
+        return np.random.normal(act_means, act_stddevs).astype(np.float32)
 
     def update(self, observes, actions, advantages, logger):
         """ Update policy based on observations, actions and advantages
@@ -179,8 +179,8 @@ class Policy(object):
         loss, kl, entropy = 0, 0, 0
         for e in range(self.epochs):
             # TODO: need to improve data pipeline - re-feeding data every epoch
-            loss, kl, entropy = self.train([observes, actions, advantages,
-                                            old_logp, old_means, old_logvars])
+            loss, kl, entropy = self.train.predict([observes, actions, advantages,
+                                                    old_logp, old_means, old_logvars])
             kl = np.mean(kl)
             entropy = np.mean(entropy)
             if kl > self.kl_targ * 4:  # early stopping if D_KL diverges badly
