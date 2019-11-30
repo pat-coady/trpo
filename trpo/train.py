@@ -306,7 +306,6 @@ def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, pol
                 break
             killer.kill_now = False
     logger.close()
-    policy.close_sess()
 
 
 if __name__ == "__main__":
