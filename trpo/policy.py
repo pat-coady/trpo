@@ -6,7 +6,7 @@ Written by Patrick Coady (pat-coady.github.io)
 import tensorflow as tf
 import tensorflow.keras.backend as K
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Dense, Layer
+from tensorflow.keras.layers import Dense, Layer, Lambda
 from tensorflow.keras.optimizers import Adam
 import numpy as np
 
@@ -36,6 +36,7 @@ class Policy(object):
         """Draw sample from policy."""
         act_means, act_logvars = self.policy(obs)
         act_stddevs = np.exp(act_logvars / 2)
+        act_stddevs = np.broadcast_to(act_stddevs, act_means.shape)
 
         return np.random.normal(act_means, act_stddevs).astype(np.float32)
 
@@ -51,12 +52,18 @@ class Policy(object):
         K.set_value(self.trpo.optimizer.lr, self.lr * self.lr_multiplier)
         K.set_value(self.trpo.beta, self.beta)
         old_means, old_logvars = self.policy(observes)
+        old_means = old_means.numpy()
+        old_logvars = old_logvars.numpy()
         old_logp = self.logprob_calc([actions, old_means, old_logvars])
+        old_logp = old_logp.numpy()
         loss, kl, entropy = 0, 0, 0
         for e in range(self.epochs):
             # TODO: need to improve data pipeline - re-feeding data every epoch
-            loss, kl, entropy = self.trpo.train_on_batch([observes, actions, advantages,
-                                                          old_logp, old_means, old_logvars])
+            loss = self.trpo.train_on_batch([observes, actions, advantages,
+                                             old_means, old_logvars, old_logp])
+            kl, entropy = self.trpo.predict_on_batch([observes, actions, advantages,
+                                                      old_means, old_logvars, old_logp])
+            kl, entropy = np.mean(kl), np.mean(entropy)
             if kl > self.kl_targ * 4:  # early stopping if D_KL diverges badly
                 break
         # TODO: too many "magic numbers" in next 8 lines of code, need to clean up
@@ -85,6 +92,7 @@ class PolicyNN(Layer):
     """
     def __init__(self, obs_dim, act_dim, hid1_mult, init_logvar, **kwargs):
         super(PolicyNN, self).__init__(**kwargs)
+        self.batch_sz = None
         self.init_logvar = init_logvar
         hid1_units = obs_dim * hid1_mult
         hid3_units = act_dim * 10  # 10 empirically determined
@@ -103,12 +111,16 @@ class PolicyNN(Layer):
         print('Policy Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}, logvar_speed: {}'
               .format(hid1_units, hid2_units, hid3_units, self.lr, logvar_speed))
 
+    def build(self, input_shape):
+        self.batch_sz = input_shape[0]
+
     def call(self, inputs, **kwargs):
         y = self.dense1(inputs)
         y = self.dense2(y)
         y = self.dense3(y)
         means = self.dense4(y)
-        logvars = K.sum(self.logvars, axis=0) + self.init_logvar
+        logvars = K.sum(self.logvars, axis=0, keepdims=True) + self.init_logvar
+        logvars = K.tile(logvars, (self.batch_sz, 1))
 
         return [means, logvars]
 
@@ -130,20 +142,19 @@ class KLEntropy(Layer):
         self.act_dim = None
 
     def build(self, input_shape):
-        self.act_dim = input_shape[-1]
+        self.act_dim = input_shape[0][1]
 
     def call(self, inputs, **kwargs):
         old_means, old_logvars, new_means, new_logvars = inputs
-        log_det_cov_old = K.sum(old_logvars)
-        log_det_cov_new = K.sum(new_logvars)
-        trace_old_new = K.sum(tf.exp(old_logvars - new_logvars))
-
-        kl = 0.5 * tf.reduce_mean(log_det_cov_new - log_det_cov_old + trace_old_new +
-                                  K.sum(K.square(new_means - old_means) /
-                                        K.exp(new_logvars), axis=-1) -
-                                  np.float32(self.act_dim))
-        entropy = 0.5 * (self.act_dim * (np.log(2 * np.pi) + 1) +
-                         K.sum(new_logvars))
+        log_det_cov_old = K.sum(old_logvars, axis=-1, keepdims=True)
+        log_det_cov_new = K.sum(new_logvars, axis=-1, keepdims=True)
+        trace_old_new = K.sum(tf.exp(old_logvars - new_logvars), axis=-1, keepdims=True)
+        kl = 0.5 * (log_det_cov_new - log_det_cov_old + trace_old_new +
+                    K.sum(K.square(new_means - old_means) /
+                          K.exp(new_logvars), axis=-1, keepdims=True) -
+                    np.float32(self.act_dim))
+        entropy = 0.5 * (np.float32(self.act_dim) * (np.log(2 * np.pi) + 1.0) +
+                         K.sum(new_logvars, axis=-1, keepdims=True))
 
         return [kl, entropy]
 
@@ -155,8 +166,9 @@ class LogProb(Layer):
 
     def call(self, inputs, **kwargs):
         actions, act_means, act_logvars = inputs
-        logp = -0.5 * K.sum(act_logvars)
-        logp += -0.5 * K.sum(K.square(actions - act_means) / K.exp(act_logvars), axis=-1)
+        logp = -0.5 * K.sum(act_logvars, axis=-1, keepdims=True)
+        logp += -0.5 * K.sum(K.square(actions - act_means) / K.exp(act_logvars),
+                             axis=-1, keepdims=True)
 
         return logp
 
@@ -177,10 +189,10 @@ class TRPO(Model):
         new_logp = self.logprob([act, new_means, new_logvars])
         kl, entropy = self.kl_entropy([old_means, old_logvars,
                                        new_means, new_logvars])
-
         loss1 = -K.mean(adv * tf.exp(new_logp - old_logp))
-        loss2 = self.beta * kl
-        loss3 = self.eta * K.square(K.maximum(0.0, kl - 2.0 * self.kl_targ))
+        loss2 = K.mean(self.beta * kl)
+        # TODO - take mean before or after hinge loss?
+        loss3 = self.eta * K.square(K.maximum(0.0, K.mean(kl) - 2.0 * self.kl_targ))
         self.add_loss(loss1 + loss2 + loss3)
 
         return [kl, entropy]
