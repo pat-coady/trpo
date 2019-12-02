@@ -191,7 +191,7 @@ class TRPO(Model):
                                        new_means, new_logvars])
         loss1 = -K.mean(adv * tf.exp(new_logp - old_logp))
         loss2 = K.mean(self.beta * kl)
-        # TODO - take mean before or after hinge loss?
+        # TODO - Take mean before or after hinge loss?
         loss3 = self.eta * K.square(K.maximum(0.0, K.mean(kl) - 2.0 * self.kl_targ))
         self.add_loss(loss1 + loss2 + loss3)
 
