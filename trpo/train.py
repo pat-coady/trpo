@@ -97,21 +97,19 @@ def run_episode(env, policy, scaler, animate=False):
     while not done:
         if animate:
             env.render()
+        obs = np.concatenate([obs, [step]])  # add time step feature
         obs = obs.astype(np.float32).reshape((1, -1))
-        obs = np.append(obs, [[step]], axis=1)  # add time step feature
         unscaled_obs.append(obs)
-        obs = (obs - offset) * scale  # center and scale observations
+        obs = np.float32((obs - offset) * scale)  # center and scale observations
         observes.append(obs)
-        action = policy.sample(obs).reshape((1, -1)).astype(np.float32)
+        action = policy.sample(obs)
         actions.append(action)
-        obs, reward, done, _ = env.step(np.squeeze(action, axis=0))
-        if not isinstance(reward, float):
-            reward = np.asscalar(np.asarray(reward))
+        obs, reward, done, _ = env.step(action.flatten())
         rewards.append(reward)
         step += 1e-3  # increment time step feature
 
     return (np.concatenate(observes), np.concatenate(actions),
-            np.array(rewards, dtype=np.float64), np.concatenate(unscaled_obs))
+            np.array(rewards, dtype=np.float32), np.concatenate(unscaled_obs))
 
 
 def run_policy(env, policy, scaler, logger, episodes):
@@ -135,6 +133,14 @@ def run_policy(env, policy, scaler, logger, episodes):
     trajectories = []
     for e in range(episodes):
         observes, actions, rewards, unscaled_obs = run_episode(env, policy, scaler)
+        # print(observes.shape)
+        # print(actions.shape)
+        # print(rewards.shape)
+        # print(unscaled_obs.shape)
+        # print(observes.dtype)
+        # print(actions.dtype)
+        # print(rewards.dtype)
+        # print(unscaled_obs.dtype)
         total_steps += observes.shape[0]
         trajectory = {'observes': observes,
                       'actions': actions,
@@ -187,7 +193,7 @@ def add_value(trajectories, val_func):
     for trajectory in trajectories:
         observes = trajectory['observes']
         values = val_func.predict(observes)
-        trajectory['values'] = values
+        trajectory['values'] = values.flatten()
 
 
 def add_gae(trajectories, gamma, lam):
@@ -275,6 +281,7 @@ def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, ini
         hid1_mult: hid1 size for policy and value_f (multiplier of obs dimension)
         init_logvar: natural log of initial policy variance
     """
+    pybullet.connect(pybullet.DIRECT)
     killer = GracefulKiller()
     env, obs_dim, act_dim = init_gym(env_name)
     obs_dim += 1  # add 1 to obs dimension for time step feature (see run_episode())

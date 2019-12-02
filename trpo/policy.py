@@ -36,7 +36,6 @@ class Policy(object):
         """Draw sample from policy."""
         act_means, act_logvars = self.policy(obs)
         act_stddevs = np.exp(act_logvars / 2)
-        act_stddevs = np.broadcast_to(act_stddevs, act_means.shape)
 
         return np.random.normal(act_means, act_stddevs).astype(np.float32)
 

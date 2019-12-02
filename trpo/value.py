@@ -67,7 +67,7 @@ class NNValueFunction(object):
         self.replay_buffer_x = x
         self.replay_buffer_y = y
         self.model.fit(x_train, y_train, epochs=self.epochs, batch_size=batch_size,
-                       shuffle=True)
+                       shuffle=True, verbose=0)
         y_hat = self.model.predict(x)
         loss = np.mean(np.square(y_hat - y))         # explained variance after update
         exp_var = 1 - np.var(y - y_hat) / np.var(y)  # diagnose over-fitting of val func
