@@ -31,7 +31,7 @@ import pybullet_envs
 import numpy as np
 from gym import wrappers
 from policy import Policy
-from value_function import NNValueFunction
+from value import NNValueFunction
 import scipy.signal
 from utils import Logger, Scaler
 from datetime import datetime
@@ -262,7 +262,7 @@ def log_batch_stats(observes, actions, advantages, disc_sum_rew, logger, episode
                 })
 
 
-def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, policy_logvar):
+def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, init_logvar):
     """ Main training loop
 
     Args:
@@ -273,7 +273,7 @@ def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, pol
         kl_targ: D_KL target for policy update [D_KL(pi_old || pi_new)
         batch_size: number of episodes per policy training batch
         hid1_mult: hid1 size for policy and value_f (multiplier of obs dimension)
-        policy_logvar: natural log of initial policy variance
+        init_logvar: natural log of initial policy variance
     """
     killer = GracefulKiller()
     env, obs_dim, act_dim = init_gym(env_name)
@@ -284,7 +284,7 @@ def main(env_name, num_episodes, gamma, lam, kl_targ, batch_size, hid1_mult, pol
     env = wrappers.Monitor(env, aigym_path, force=True)
     scaler = Scaler(obs_dim)
     val_func = NNValueFunction(obs_dim, hid1_mult)
-    policy = Policy(obs_dim, act_dim, kl_targ, hid1_mult, policy_logvar)
+    policy = Policy(obs_dim, act_dim, kl_targ, hid1_mult, init_logvar)
     # run a few episodes of untrained policy to initialize scaler:
     run_policy(env, policy, scaler, logger, episodes=5)
     episode = 0
@@ -326,7 +326,7 @@ if __name__ == "__main__":
                         help='Size of first hidden layer for value and policy NNs'
                              '(integer multiplier of observation dimension)',
                         default=10)
-    parser.add_argument('-v', '--policy_logvar', type=float,
+    parser.add_argument('-v', '--init_logvar', type=float,
                         help='Initial policy log-variance (natural log of variance)',
                         default=-1.0)
 
