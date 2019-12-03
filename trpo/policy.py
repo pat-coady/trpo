@@ -1,5 +1,5 @@
 """
-NN Policy with KL Divergence Constraint (PPO / TRPO)
+NN Policy with KL Divergence Constraint
 
 Written by Patrick Coady (pat-coady.github.io)
 """

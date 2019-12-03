@@ -1,12 +1,10 @@
 #! /usr/bin/env python3
 """
-PPO: Proximal Policy Optimization
+TRPO: Trust Region Policy Optimization
 
 Written by Patrick Coady (pat-coady.github.io)
 
-PPO uses a loss function and gradient descent to approximate
-Trust Region Policy Optimization (TRPO). See these papers for
-details:
+See these papers for details:
 
 TRPO / PPO:
 https://arxiv.org/pdf/1502.05477.pdf (Schulman et al., 2016)
