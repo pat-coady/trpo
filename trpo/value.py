@@ -34,7 +34,7 @@ class NNValueFunction(object):
         hid3_units = 5  # 5 chosen empirically on 'Hopper-v1'
         hid2_units = int(np.sqrt(hid1_units * hid3_units))
         # heuristic to set learning rate based on NN size (tuned on 'Hopper-v1')
-        self.lr = 1e-2 / np.sqrt(hid2_units)  # 1e-3 empirically determined
+        self.lr = 1e-2 / np.sqrt(hid2_units)  # 1e-2 empirically determined
         print('Value Params -- h1: {}, h2: {}, h3: {}, lr: {:.3g}'
               .format(hid1_units, hid2_units, hid3_units, self.lr))
         y = Dense(hid1_units, activation='tanh')(obs)

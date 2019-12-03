@@ -3,10 +3,9 @@ NN Policy with KL Divergence Constraint (PPO / TRPO)
 
 Written by Patrick Coady (pat-coady.github.io)
 """
-import tensorflow as tf
 import tensorflow.keras.backend as K
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Dense, Layer, Lambda
+from tensorflow.keras.layers import Dense, Layer
 from tensorflow.keras.optimizers import Adam
 import numpy as np
 
@@ -57,7 +56,6 @@ class Policy(object):
         old_logp = old_logp.numpy()
         loss, kl, entropy = 0, 0, 0
         for e in range(self.epochs):
-            # TODO: need to improve data pipeline - re-feeding data every epoch
             loss = self.trpo.train_on_batch([observes, actions, advantages,
                                              old_means, old_logvars, old_logp])
             kl, entropy = self.trpo.predict_on_batch([observes, actions, advantages,
@@ -147,7 +145,7 @@ class KLEntropy(Layer):
         old_means, old_logvars, new_means, new_logvars = inputs
         log_det_cov_old = K.sum(old_logvars, axis=-1, keepdims=True)
         log_det_cov_new = K.sum(new_logvars, axis=-1, keepdims=True)
-        trace_old_new = K.sum(tf.exp(old_logvars - new_logvars), axis=-1, keepdims=True)
+        trace_old_new = K.sum(K.exp(old_logvars - new_logvars), axis=-1, keepdims=True)
         kl = 0.5 * (log_det_cov_new - log_det_cov_old + trace_old_new +
                     K.sum(K.square(new_means - old_means) /
                           K.exp(new_logvars), axis=-1, keepdims=True) -
@@ -188,7 +186,7 @@ class TRPO(Model):
         new_logp = self.logprob([act, new_means, new_logvars])
         kl, entropy = self.kl_entropy([old_means, old_logvars,
                                        new_means, new_logvars])
-        loss1 = -K.mean(adv * tf.exp(new_logp - old_logp))
+        loss1 = -K.mean(adv * K.exp(new_logp - old_logp))
         loss2 = K.mean(self.beta * kl)
         # TODO - Take mean before or after hinge loss?
         loss3 = self.eta * K.square(K.maximum(0.0, K.mean(kl) - 2.0 * self.kl_targ))

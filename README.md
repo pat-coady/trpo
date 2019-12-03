@@ -1,16 +1,18 @@
-## Proximal Policy Optimization with Generalized Advantage Estimation
+## Trust Region Policy Optimization with Generalized Advantage Estimation
 
 By Patrick Coady: [Learning Artificial Intelligence](https://learningai.io/)
 
-### NOTE: Refactor to TensorFlow 2.0 and PyBullet in progress. See `tf1_mujoco` branch for old version.
-
 ### Summary
 
-The same learning algorithm was used to train agents for each of the ten OpenAI Gym MuJoCo continuous control environments. The only difference between evaluations was the number of episodes used per training batch, otherwise all options were the same. The exact code used to generate the OpenAI Gym submissions is in the **`aigym_evaluation`** branch.
+**NOTE:** The code has been refactored to use TensorFlow 2.0 and PyBullet (instead of MuJoCo). See the `tf1_mujoco` branch for old version.
+
+The project's original goal was to use the same algorithm to "solve" [10 MuJoCo robotic control environments](https://gym.openai.com/envs/#mujoco). And, specifically, to achieve this without hand-tuning the hyperparameters (network sizes, learning rates, and TRPO settings) for each environment. This is challenging because the environments range from a simple cart pole problem with a single control input to a humanoid with 17 controlled joints and 44 observed variables. The project was successful, nabbing top spots on almost all of the AI Gym MuJoCo leaderboards.
+
+With the release of TensorFlow 2.0, I decided to dust off this project and upgrade the code. And, while I was at it, I moved from the paid MuJoCo simulator to the free PyBullet simulator.
 
 Here are the key points:
 
-* Proximal Policy Optimization (similar to TRPO, but uses gradient descent with KL loss terms)  \[1\] \[2\]
+* Trust Region Policy Optimization \[1\] \[2\]
 * Value function approximated with 3 hidden-layer NN (tanh activations):
     * hid1 size = obs_dim x 10
     * hid2 size = geometric mean of hid1 and hid3 sizes
@@ -31,32 +33,54 @@ Here are the key points:
 * KL loss factor and ADAM learning rate are dynamically adjusted during training
 * Policy and Value NNs built with TensorFlow
 
-## Dependencies
-
-* Python 3.5
-* The Usual Suspects: NumPy, matplotlib, scipy
-* TensorFlow
-* gym - [installation instructions](https://gym.openai.com/docs)
-* [MuJoCo](http://www.mujoco.org/) (30-day trial available and free to students)
-
-### Results can be reproduced as follows:
+### PyBullet Gym Environments
 
 ```
-./train.py Reacher-v1 -n 60000 -b 50
-./train.py InvertedPendulum-v1
-./train.py InvertedDoublePendulum-v1 -n 12000
-./train.py Swimmer-v1 -n 2500 -b 5
-./train.py Hopper-v1 -n 30000
-./train.py HalfCheetah-v1 -n 3000 -b 5
-./train.py Walker2d-v1 -n 25000
-./train.py Ant-v1 -n 100000
-./train.py Humanoid-v1 -n 200000
-./train.py HumanoidStandup-v1 -n 200000 -b 5
+HumanoidDeepMimicBulletEnv-v1
+CartPoleBulletEnv-v1
+MinitaurBulletEnv-v0
+MinitaurBulletDuckEnv-v0
+RacecarBulletEnv-v0
+RacecarZedBulletEnv-v0
+KukaBulletEnv-v0
+KukaCamBulletEnv-v0
+InvertedPendulumBulletEnv-v0
+InvertedDoublePendulumBulletEnv-v0
+InvertedPendulumSwingupBulletEnv-v0
+ReacherBulletEnv-v0
+PusherBulletEnv-v0
+ThrowerBulletEnv-v0
+StrikerBulletEnv-v0
+Walker2DBulletEnv-v0
+HalfCheetahBulletEnv-v0
+AntBulletEnv-v0
+HopperBulletEnv-v0
+HumanoidBulletEnv-v0
+HumanoidFlagrunBulletEnv-v0
+HumanoidFlagrunHarderBulletEnv-v0
 ```
 
-### View the videos
+### Using
 
-During training, videos are periodically saved automatically to the /tmp folder. These can be enjoyable, and also instructive.
+I ran quick checks on three of the above environments and successfully stabilized a double-inverted pendulum and taught the "half cheetah" to run.
+
+```
+python train.py InvertedPendulumBulletEnv-v0
+python train.py InvertedDoublePendulumBulletEnv-v0 -n 5000
+python train.py HalfCheetahBulletEnv-v0 -n 5000 -b 5
+```
+
+### Videos
+
+During training, videos are periodically saved automatically to the /tmp folder. These can be enjoyable to view, and also instructive.
+
+### Dependencies
+
+* Python 3.6
+* The Usual Suspects: numpy, matplotlib, scipy
+* TensorFlow 2.x
+* Open AI Gym: [installation instructions](https://gym.openai.com/docs)
+* [pybullet](https://pypi.org/project/pybullet/) physics simulator
 
 ### References
 
