@@ -36,26 +36,24 @@ Here are the key points:
 ### PyBullet Gym Environments
 
 ```
-HumanoidDeepMimicBulletEnv-v1
-CartPoleBulletEnv-v1
-MinitaurBulletEnv-v0
-MinitaurBulletDuckEnv-v0
-RacecarBulletEnv-v0
-RacecarZedBulletEnv-v0
-KukaBulletEnv-v0
-KukaCamBulletEnv-v0
+CartPoleContinuousBulletEnv-v0
 InvertedPendulumBulletEnv-v0
 InvertedDoublePendulumBulletEnv-v0
 InvertedPendulumSwingupBulletEnv-v0
-ReacherBulletEnv-v0
-PusherBulletEnv-v0
-ThrowerBulletEnv-v0
-StrikerBulletEnv-v0
 Walker2DBulletEnv-v0
 HalfCheetahBulletEnv-v0
 AntBulletEnv-v0
 HopperBulletEnv-v0
 HumanoidBulletEnv-v0
+ReacherBulletEnv-v0
+PusherBulletEnv-v0
+ThrowerBulletEnv-v0
+StrikerBulletEnv-v0
+MinitaurBulletEnv-v0
+MinitaurBulletDuckEnv-v0
+RacecarBulletEnv-v0
+KukaBulletEnv-v0
+KukaDiverseObjectGrasping-v0
 HumanoidFlagrunBulletEnv-v0
 HumanoidFlagrunHarderBulletEnv-v0
 ```
